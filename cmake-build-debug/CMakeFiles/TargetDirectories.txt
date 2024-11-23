@@ -1,0 +1,4 @@
+/home/tobias/Documentos/Protos/pop/cmake-build-debug/CMakeFiles/main.dir
+/home/tobias/Documentos/Protos/pop/cmake-build-debug/CMakeFiles/pop.dir
+/home/tobias/Documentos/Protos/pop/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/tobias/Documentos/Protos/pop/cmake-build-debug/CMakeFiles/rebuild_cache.dir
