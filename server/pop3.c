@@ -9,7 +9,6 @@
 
 static unsigned
 pop_write(struct selector_key *key) {
-    printf("echo writeee\n");
     pop3* datos = key->data;
     size_t count;
     uint8_t* ptr = buffer_read_ptr(datos->buff, &count);
@@ -59,7 +58,6 @@ static unsigned pop_read(struct selector_key *key){
 }
 
 void pop_greeting(const unsigned state, struct selector_key *key){
-    printf("en greeting\n");
     size_t lenght;
     char greeting[] = "+OK PushPOP3 server is here for you\r\n";
     uint8_t *buf = buffer_write_ptr(ATTACHMENT(key)->buff, &lenght);
