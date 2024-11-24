@@ -27,6 +27,7 @@
 #include "include/pop3.h"
 #include "include/buffer.h"
 #include "include/selector.h"
+#include "include/args.h"
 
 static bool done = false;
 
@@ -40,7 +41,10 @@ void
 socksv5_passive_accept(struct selector_key *key) ;
 
 int
-main(const int argc, const char **argv) {
+main(int argc, char **argv) {
+
+    struct pop3args args;
+    parse_args(argc,argv,&args);
 
     unsigned pop3_port = 2252;
     //unsigned configurator_port = 2254;

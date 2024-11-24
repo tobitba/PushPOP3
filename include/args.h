@@ -18,8 +18,8 @@ struct doh {
     char           *query;
 };
 
-struct socks5args {
-    char           *socks_addr;
+struct pop3args {
+    char           *socks_addr; //TODO, revisar bien...
     unsigned short  socks_port;
 
     char *          mng_addr;
@@ -37,7 +37,7 @@ struct socks5args {
  * la ejecución.
  */
 void 
-parse_args(const int argc, char **argv, struct socks5args *args);
+parse_args(const int argc, char **argv, struct pop3args *args);
 
 #endif
 
