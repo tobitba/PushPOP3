@@ -24,8 +24,9 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
-#include "include/selector.h"
+#include "include/pop3.h"
 #include "include/buffer.h"
+#include "include/selector.h"
 
 static bool done = false;
 
@@ -41,7 +42,9 @@ socksv5_passive_accept(struct selector_key *key) ;
 int
 main(const int argc, const char **argv) {
 
-    unsigned port = 2252;
+    unsigned pop3_port = 2252;
+    //unsigned configurator_port = 2254;
+    //unsigned port = 2256;
 
     //insert args parser
 
@@ -56,7 +59,7 @@ main(const int argc, const char **argv) {
     memset(&addr, 0, sizeof(addr));
     addr.sin_family      = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    addr.sin_port        = htons(port);
+    addr.sin_port        = htons(pop3_port);
 
     const int server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if(server < 0) {
@@ -64,7 +67,7 @@ main(const int argc, const char **argv) {
         goto finally;
     }
 
-    fprintf(stdout, "Listening on TCP port %d\n", port);
+    fprintf(stdout, "Listening on TCP port %d\n", pop3_port);
 
     // man 7 ip. no importa reportar nada si falla.
     setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
@@ -105,12 +108,12 @@ main(const int argc, const char **argv) {
         err_msg = "unable to create selector";
         goto finally;
     }
-    const struct fd_handler socksv5 = {
-        .handle_read       = socksv5_passive_accept,
+    const struct fd_handler pop3_pasive_handler = {
+        .handle_read       = pop3_passive_accept,
         .handle_write      = NULL,
         .handle_close      = NULL, // nada que liberar
     };
-    ss = selector_register(selector, server, &socksv5,
+    ss = selector_register(selector, server, &pop3_pasive_handler,
                                               OP_READ, NULL);
     if(ss != SELECTOR_SUCCESS) {
         err_msg = "registering fd";
@@ -152,6 +155,19 @@ finally:
     }
     return ret;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 struct echo {
     int pointer_a , pointer_b;
