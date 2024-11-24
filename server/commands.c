@@ -119,11 +119,11 @@ static bool readCommandArg(Command command, char * arg, buffer * b) {
     for (; j < MAX_ARG_LENGHT; j++) {
         char c = (char) buffer_peak(b);
         if (c == SPACE_CHAR || c == ENTER_CHAR) {
-            if (j == 0) { // The argument after the firstspace was another space
+            if (j == 0) { // The argument after the first space was another space or enter. Ex: USER__ Or User_\n
                 free(command);
                 return false;
             }
-            break; // If j != 0, there's a word between the first space and this one, it could be for another argument
+            break; // If j != 0, there's a word between the first space and this char, it could be followed by another argument or end there if '\n'
         }
         c = (char) buffer_read(b);
         if (!IS_PRINTABLE_ASCII(c)) {
