@@ -29,6 +29,7 @@ struct pop3args {
 
     struct doh      doh;
     struct users    users[MAX_USERS];
+    int user_count;
 };
 
 /**

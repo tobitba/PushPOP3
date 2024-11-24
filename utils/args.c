@@ -160,4 +160,5 @@ parse_args(const int argc, char **argv, struct pop3args *args) {
         fprintf(stderr, "\n");
         exit(1);
     }
+    args->user_count = nusers;
 }

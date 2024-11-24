@@ -48,7 +48,7 @@ main(int argc, char **argv) {
 
     struct pop3args args;
     parse_args(argc,argv,&args);
-    init_authenticator(args.users);
+    init_authenticator(args.users,args.user_count);
 
     unsigned pop3_port = 2252;
     //unsigned configurator_port = 2254;
