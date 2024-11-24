@@ -47,7 +47,7 @@ state stat_handler(pop3* data, char* arg1, char* arg2) {
 
 
 static const CommandCDT commands[COMMAND_COUNT] = {
-    { .state = AUTHORIZATION , .command_name = "USER" , .execute = user_handler, .argCount = 1 },
+    { .state = AUTHORIZATION, .command_name = "USER" , .execute = user_handler, .argCount = 1 },
     { .state = TRANSACTION, .command_name = "STAT" , .execute = stat_handler, .argCount = 0 },
 };
 
@@ -58,7 +58,7 @@ static Command findCommand(const char* name, const state current) {
             if (command == NULL)
                 return NULL;
             command->state = current;
-            strncpy(command->command_name, name, MAX_COMMAND_LENGHT);
+            strncpy(command->command_name, name, MAX_COMMAND_LENGHT + 1);
             command->execute = commands[i].execute;
             command->argCount = commands[i].argCount;
             return command;
@@ -72,16 +72,12 @@ Command getCommand(buffer *b, const state current) {
     //los comandos en pop3 son de 4 caracteres (case insensitive)
     char commandName[MAX_COMMAND_LENGHT + 1] = {0};
     int i = 0;
-    printf("%d\n", buffer_can_read(b));
     for (; i < MAX_COMMAND_LENGHT && buffer_can_read(b); i++) {
         char c = (char) buffer_read(b);
-        printf("%c", c);
         if (!IS_ALPHABET(c))
             return NULL;
         commandName[i] = c;
     }
-    printf("HOLA?\n");
-    printf("%s\n", commandName);
     Command command = findCommand(commandName, current);
     if (command == NULL) {
         return NULL;
@@ -108,6 +104,7 @@ state runCommand(Command command, pop3* datos) {
         return ERROR;
     }
 
+    printf("Running command: %s\n", command->command_name);
     state newState = command->execute(datos, command->arg1, command->arg2);
     free(command);
     return newState;
@@ -118,11 +115,10 @@ static bool readCommandArg(Command command, char * arg, buffer * b) {
         free(command);
         return false;
     }
-
     int j = 0;
     for (; j < MAX_ARG_LENGHT; j++) {
         char c = (char) buffer_peak(b);
-        if (c == SPACE_CHAR) {
+        if (c == SPACE_CHAR || c == ENTER_CHAR) {
             if (j == 0) { // The argument after the firstspace was another space
                 free(command);
                 return false;
