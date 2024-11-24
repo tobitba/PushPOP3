@@ -15,9 +15,9 @@ $(TARGET_CLIENT): $(OBJECTS_CLIENT) $(OBJECTS_COMMON)
 	$(CC) $(CFLAGS) $^ -o $@
 
 $(TARGET_SERVER): $(OBJECTS_SERVER) $(OBJECTS_COMMON)
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(CFLAGS) $^ -o $@.out
 
 clean:
-	rm -rf $(OBJECTS) $(TARGET_SERVER) $(TARGET_CLIENT)
+	rm -rf $(OBJECTS) $(TARGET_SERVER).out $(TARGET_CLIENT)
 
 .PHONY: all clean
