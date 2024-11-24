@@ -28,8 +28,11 @@
 #include "include/buffer.h"
 #include "include/selector.h"
 #include "include/args.h"
+#include "include/authenticator.h"
 
 static bool done = false;
+
+
 
 static void
 sigterm_handler(const int signal) {
@@ -45,6 +48,7 @@ main(int argc, char **argv) {
 
     struct pop3args args;
     parse_args(argc,argv,&args);
+    init_authenticator(args.users);
 
     unsigned pop3_port = 2252;
     //unsigned configurator_port = 2254;
