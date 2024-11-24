@@ -68,14 +68,21 @@ buffer_read_adv(buffer *b, const ssize_t bytes) {
 }
 
 inline uint8_t
-buffer_read(buffer *b) {
+buffer_peak(buffer *b) {
     uint8_t ret;
     if(buffer_can_read(b)) {
         ret = *b->read;
-        buffer_read_adv(b, 1);
     } else {
         ret = 0;
     }
+    return ret;
+}
+
+inline uint8_t
+buffer_read(buffer *b) {
+    uint8_t ret = buffer_peak(b);
+    if (ret != 0)
+        buffer_read_adv(b, 1);
     return ret;
 }
 

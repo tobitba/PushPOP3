@@ -6,12 +6,16 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
-#define MAX_COMMAND_LENGHT 5
-#define MAX_ARG_LENGHT 41
+#define MAX_COMMAND_LENGHT 4
+#define MAX_ARG_LENGHT 40
 #define COMMAND_COUNT 2
 #define SPACE_CHAR 32
+#define ENTER_CHAR '\n'
 
 #define IS_UPPER_CASE_LETTER(n) ((n) >= 'A' && (n) <= 'Z')
+#define IS_LOWER_CASE_LETTER(n) ((n) >= 'a' && (n) <= 'z')
+#define IS_ALPHABET(n) (IS_LOWER_CASE_LETTER(n) || IS_UPPER_CASE_LETTER(n))
+
 // from "!"(33) to "~"(126)
 #define IS_PRINTABLE_ASCII(n) ((n) >= '!' && (n) <= '~')
 
@@ -20,11 +24,11 @@ typedef state (*handler) (pop3 * datos, char* arg1, char* arg2);
 typedef struct CommandCDT
 {
     state state;
-    char command_name[MAX_COMMAND_LENGHT];
+    char command_name[MAX_COMMAND_LENGHT + 1];
     handler execute; 
     int argCount;
-    char arg1[MAX_ARG_LENGHT];
-    char arg2[MAX_ARG_LENGHT];
+    char arg1[MAX_ARG_LENGHT + 1];
+    char arg2[MAX_ARG_LENGHT + 1];
 } CommandCDT;
 
 static bool readCommandArg(Command command, char * arg, buffer * b);
@@ -66,14 +70,17 @@ static Command findCommand(const char* name, const state current) {
 
 Command getCommand(buffer *b, const state current) {
     //los comandos en pop3 son de 4 caracteres (case insensitive)
-    char commandName[MAX_COMMAND_LENGHT] = {0};
+    char commandName[MAX_COMMAND_LENGHT + 1] = {0};
     int i = 0;
-    for (; i < MAX_COMMAND_LENGHT && buffer_can_read(b); i++) {
-        char c = (char) buffer_read(b);
-        if (!IS_UPPER_CASE_LETTER(c)) // todo cambiar a alphabetic
+    for (; i < MAX_COMMAND_LENGHT && !buffer_can_read(b); i++) {
+        char c = buffer_read(b);
+        printf("%c\n", c);
+        if (!IS_ALPHABET(c))
             return NULL;
         commandName[i] = c;
     }
+    printf("HOLA?\n");
+    printf("%s\n", commandName);
     Command command = findCommand(commandName, current);
     if (command == NULL) {
         return NULL;
@@ -88,7 +95,7 @@ Command getCommand(buffer *b, const state current) {
         if (!readCommandArg(command, command->arg2, b))
             return NULL;
     }
-    if (!buffer_can_read(b) || buffer_read(b) != '\n') {
+    if (!buffer_can_read(b) || buffer_read(b) != ENTER_CHAR) {
         free(command);
         return NULL;
     }
@@ -111,21 +118,23 @@ static bool readCommandArg(Command command, char * arg, buffer * b) {
         return false;
     }
 
-    for (int j = 0; j < MAX_ARG_LENGHT; j++) {
-        char c = (char) buffer_read(b);
+    int j = 0;
+    for (; j < MAX_ARG_LENGHT; j++) {
+        char c = (char) buffer_peak(b);
         if (c == SPACE_CHAR) {
-            if (j == 0) {
+            if (j == 0) { // The argument after the firstspace was another space
                 free(command);
                 return false;
             }
-            break; // todo USER_foasjfoas_\n
+            break; // If j != 0, there's a word between the first space and this one, it could be for another argument
         }
+        c = (char) buffer_read(b);
         if (!IS_PRINTABLE_ASCII(c)) {
             free(command);
             return false;
         }
         arg[j] = c;
     }
-    // todo '0'
+    arg[j] = '\0';
     return true;
 }

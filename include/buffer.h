@@ -116,6 +116,12 @@ void
 buffer_read_adv(buffer *b, const ssize_t bytes);
 
 /**
+ * obtiene un byte, sin avanzar en el buffer
+ */
+uint8_t
+buffer_peak(buffer *b);
+
+/**
  * obtiene un byte
  */
 uint8_t
