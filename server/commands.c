@@ -11,8 +11,7 @@ typedef struct pop_command
     enum pop3_states state;
     char command_name[MAX_COMMAND_LENGHT];
     handler execute; 
-
-    
+    int argCount;
 } pop_command;
 
 state user_handler(pop3 * datos, char* arg1, char* arg2){
@@ -22,7 +21,7 @@ state user_handler(pop3 * datos, char* arg1, char* arg2){
 
 static const pop_command commands[COMMAND_COUNT] = {
 
-    { .state = AUTHORIZATION , .command_name = "USER" , .execute = user_handler },
+    { .state = AUTHORIZATION , .command_name = "USER" , .execute = user_handler, .argCount = 1 },
 
 };
 
