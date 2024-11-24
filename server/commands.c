@@ -26,8 +26,7 @@ static const pop_command commands[COMMAND_COUNT] = {
 };
 
 handler getCommandHandler(char* name, state current){
-    int i = 0;
-    while(i < COMMAND_COUNT){
+    for(int i = 0; i < COMMAND_COUNT; i++) {
         if(commands[i].state == current && strncasecmp(name,commands[i].command_name, MAX_COMMAND_LENGHT)){
             return commands[i].execute;
         }
@@ -39,8 +38,7 @@ handler getCommandHandler(char* name, state current){
 int getCommand(buffer *b, state current){
     //los comandos en popo3 son de 4 caracteres (case insensitive)
     char command[MAX_COMMAND_LENGHT] = {0};
-    int i = 0;
-    while(i < MAX_COMMAND_LENGHT && buffer_can_read(b)){
+    for (int i = 0; i < MAX_COMMAND_LENGHT && buffer_can_read(b); i++) {
         command[i] = buffer_read(b);
     }
     return command[0];
