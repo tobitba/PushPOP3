@@ -4,6 +4,7 @@
 #include "selector.h"
 #include "buffer.h"
 #include "stm.h"
+#include "args.h"
 
 #define BUFFER_SIZE 521  //TODO : revisar tamaño
 
@@ -30,12 +31,12 @@ typedef struct pop3
     struct state_machine stm;
     uint8_t raw_buff[BUFFER_SIZE];
     buffer *buff;
+    struct users user;
 
 } pop3;
 
 
 void pop3_passive_accept(struct selector_key *key);
-
 
 
 #endif
