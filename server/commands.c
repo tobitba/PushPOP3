@@ -72,9 +72,10 @@ Command getCommand(buffer *b, const state current) {
     //los comandos en pop3 son de 4 caracteres (case insensitive)
     char commandName[MAX_COMMAND_LENGHT + 1] = {0};
     int i = 0;
-    for (; i < MAX_COMMAND_LENGHT && !buffer_can_read(b); i++) {
-        char c = buffer_read(b);
-        printf("%c\n", c);
+    printf("%d\n", buffer_can_read(b));
+    for (; i < MAX_COMMAND_LENGHT && buffer_can_read(b); i++) {
+        char c = (char) buffer_read(b);
+        printf("%c", c);
         if (!IS_ALPHABET(c))
             return NULL;
         commandName[i] = c;

@@ -46,14 +46,12 @@ static unsigned pop_read(struct selector_key *key){
     {
         return ERROR;
     }else{
+      	buffer_write_adv(datos->buff, n);
 		Command command = getCommand(datos->buff, datos->stm.current->state);
         if(command != NULL){
         	state newState = runCommand(command, datos);
         	printf("%d\n", newState);
         }
-        buffer_write_adv(datos->buff, n);
-
-        
     }
     
     selector_set_interest_key(key, OP_WRITE);
