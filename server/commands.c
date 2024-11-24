@@ -1,5 +1,5 @@
-#include "../include/buffer.h"
 #include "../include/pop3.h"
+#include "../include/buffer.h"
 #include <strings.h>
 #define MAX_COMMAND_LENGHT 5
 #define COMMAND_COUNT 1
@@ -44,6 +44,6 @@ int getCommand(buffer *b, state current){
     while(i < MAX_COMMAND_LENGHT && buffer_can_read(b)){
         command[i] = buffer_read(b);
     }
-    return 0;
+    return command[0];
 }
 

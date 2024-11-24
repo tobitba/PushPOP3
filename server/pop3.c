@@ -67,17 +67,23 @@ void pop_greeting(const unsigned state, struct selector_key *key){
     buffer_write_adv(ATTACHMENT(key)->buff, lenght);
 }
 
+static unsigned test(struct selector_key *key){
+    pop_greeting(AUTHORIZATION,key);
+    return AUTHORIZATION;
+}
+
 static const struct state_definition pop3_states_handlers[] = {
     {
         .state = AUTHORIZATION,
         .on_arrival = pop_greeting,        
-        .on_read_ready = pop_read,  
+        .on_read_ready = test,  
         .on_write_ready = pop_write, 
     },
     {
         .state = TRANSACTION,
-        .on_read_ready = NULL,  
-        .on_write_ready = pop_write, 
+        .on_write_ready = NULL,  
+        .on_read_ready = pop_read,
+     
     },
     {
         .state = UPDATE
@@ -166,7 +172,7 @@ void pop3_passive_accept(struct selector_key *key){
     if(selector_fd_set_nio(client) == -1) {
         goto fail;
     }
-    datos = malloc(sizeof(pop3));
+    datos = calloc(1,sizeof(pop3));
     datos->buff = malloc(sizeof(struct buffer));
     buffer_init(datos->buff,BUFFER_SIZE,datos->raw_buff);
     datos->stm.initial = AUTHORIZATION;
