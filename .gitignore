@@ -1,0 +1,15 @@
+# Compiled object files
+*.o
+*.obj
+
+# Executable files
+*.exe 
+*.out
+*.app
+
+# IDE and editor files
+.vscode/
+.idea/
+.code-workspace/
+.cproject/
+.workspace/
