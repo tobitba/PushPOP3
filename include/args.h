@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #define MAX_USERS 10
+#define MAX_ARG_LENGHT 41
 
 struct users {
     char *name;
