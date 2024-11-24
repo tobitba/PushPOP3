@@ -57,7 +57,6 @@ usage(const char *progname) {
         "   -u <name>:<pass> Usuario y contraseña de usuario que puede usar el servidor. Hasta 10.\n"
         "   -v               Imprime información sobre la versión versión y termina.\n"
         "   -d <dir>         Carpeta donde residen los Maildirs"
-        "   -t <cmd>         Comando para aplicar transformaciones"
         "\n",
         progname);
     exit(1);
