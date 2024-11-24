@@ -6,6 +6,7 @@
 
 #define ATTACHMENT(key) ( (pop3*)(key)->data)
 
+
 static unsigned
 pop_write(struct selector_key *key) {
     printf("echo writeee\n");
@@ -33,7 +34,27 @@ pop_write(struct selector_key *key) {
     return TRANSACTION; //TODO: estoy es un puente al estado de TRANSACTIONAL, cambiar cuando se tenga manejo de users
 }
 
+
+
+
 static unsigned pop_read(struct selector_key *key){
+    pop3* datos = ATTACHMENT(key);
+    size_t count;
+    uint8_t* ptr = buffer_write_ptr(datos->buff, &count);
+    ssize_t n = recv(key->fd, ptr, count, 0);
+    if(n <= 0)
+    {
+        return ERROR;
+    }else{
+        //currentState = parseCommand()
+        buffer_write_adv(datos->buff, n);
+
+        
+    }
+    
+    selector_set_interest_key(key, OP_WRITE);
+
+
     return 0;
 }
 

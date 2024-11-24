@@ -23,6 +23,7 @@ enum pop3_states
     FINISH, 
 };
 
+typedef enum pop3_states state;
 
 typedef struct pop3
 {
