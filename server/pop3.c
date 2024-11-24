@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "../include/selector.h"
+#include "../include/commands.h"
 
 #define ATTACHMENT(key) ( (pop3*)(key)->data)
 
@@ -45,7 +46,11 @@ static unsigned pop_read(struct selector_key *key){
     {
         return ERROR;
     }else{
-        //currentState = parseCommand()
+		Command command = getCommand(datos->buff, datos->stm.current->state);
+        if(command != NULL){
+        	state newState = runCommand(command, datos);
+        	printf("%d\n", newState);
+        }
         buffer_write_adv(datos->buff, n);
 
         
@@ -67,7 +72,7 @@ void pop_greeting(const unsigned state, struct selector_key *key){
 
 static unsigned test(struct selector_key *key){
     pop_greeting(AUTHORIZATION,key);
-    return AUTHORIZATION;
+    return TRANSACTION;
 }
 
 static const struct state_definition pop3_states_handlers[] = {
@@ -79,7 +84,7 @@ static const struct state_definition pop3_states_handlers[] = {
     },
     {
         .state = TRANSACTION,
-        .on_write_ready = NULL,  
+        .on_write_ready = pop_write,
         .on_read_ready = pop_read,
      
     },
