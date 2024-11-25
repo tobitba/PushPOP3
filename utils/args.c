@@ -4,6 +4,7 @@
 #include <stdio.h>  /* for printf */
 #include <stdlib.h> /* for exit */
 #include <string.h> /* memset */
+#include <sys/stat.h>
 
 #include "../include/args.h"
 
@@ -19,7 +20,8 @@ static unsigned short port(const char* s) {
   return (unsigned short)sl;
 }
 
-static void user(char* s, User* user) {
+static User newUser(char* s) {
+  User user;
   char* p = strchr(s, ':');
   if (p == NULL) {
     fprintf(stderr, "password not found\n");
@@ -27,9 +29,20 @@ static void user(char* s, User* user) {
   } else {
     *p = 0;
     p++;
-    user->name = s;
-    user->pass = p;
+    user.name = s;
+    user.pass = p;
   }
+  return user;
+}
+
+static const char* validatedDirectory(const char* path) {
+  struct stat path_stat;
+  stat(path, &path_stat);
+  if (!S_ISDIR(path_stat.st_mode)) {
+    fprintf(stderr, "Path %s is not a directory", path);
+    exit(1);
+  }
+  return path;
 }
 
 static void version(void) {
@@ -68,13 +81,13 @@ void parse_args(const int argc, char** argv, struct pop3args* args) {
   args->mng_addr = "127.0.0.1";
   args->mng_port = 8080;
 
-  args->disectors_enabled = true;
-
   args->doh.host = "localhost";
   args->doh.ip = "127.0.0.1";
   args->doh.port = 8053;
   args->doh.path = "/getnsrecord";
   args->doh.query = "?dns=";
+
+  args->maildirPath = NULL;
 
   int c;
   int nusers = 0;
@@ -87,7 +100,7 @@ void parse_args(const int argc, char** argv, struct pop3args* args) {
       {"doh-query", required_argument, 0, 0xD005}, {0, 0, 0, 0}
     };
 
-    c = getopt_long(argc, argv, "hl:L:Np:P:u:v", long_options, &option_index);
+    c = getopt_long(argc, argv, "hl:L:Np:P:u:vd:", long_options, &option_index);
     if (c == -1) break;
 
     switch (c) {
@@ -100,9 +113,6 @@ void parse_args(const int argc, char** argv, struct pop3args* args) {
     case 'L':
       args->mng_addr = optarg;
       break;
-    case 'N':
-      args->disectors_enabled = false;
-      break;
     case 'p':
       args->socks_port = port(optarg);
       break;
@@ -114,13 +124,16 @@ void parse_args(const int argc, char** argv, struct pop3args* args) {
         fprintf(stderr, "maximun number of command line users reached: %d.\n", MAX_USERS);
         exit(1);
       } else {
-        user(optarg, args->users + nusers);
+        args->users[nusers] = newUser(optarg);
         nusers++;
       }
       break;
     case 'v':
       version();
       exit(0);
+      break;
+    case 'd':
+      args->maildirPath = validatedDirectory(optarg);
       break;
     case 0xD001:
       args->doh.ip = optarg;
@@ -142,6 +155,13 @@ void parse_args(const int argc, char** argv, struct pop3args* args) {
       exit(1);
     }
   }
+  for (int i = 0; i < nusers; ++i) {
+    printf("user: %s, pass: %s\n", args->users[i].name, args->users[i].pass);
+  }
+  if (args->maildirPath == NULL) {
+    fprintf(stderr, "Missing required flag `-d <maildir path>`\n");
+    exit(EXIT_FAILURE);
+  }
   if (optind < argc) {
     fprintf(stderr, "argument not accepted: ");
     while (optind < argc) {
@@ -150,5 +170,5 @@ void parse_args(const int argc, char** argv, struct pop3args* args) {
     fprintf(stderr, "\n");
     exit(1);
   }
-  args->user_count = nusers;
+  args->userCount = nusers;
 }

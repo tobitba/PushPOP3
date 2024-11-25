@@ -26,11 +26,11 @@ struct pop3args {
   char* mng_addr;
   unsigned short mng_port;
 
-  bool disectors_enabled;
-
   struct doh doh;
   User users[MAX_USERS];
   int user_count;
+
+  const char* maildirPath;
 };
 
 /**
