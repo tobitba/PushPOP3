@@ -11,6 +11,7 @@
 
 enum pop3_states
 {
+    GREETING,
     // For USER,  CAPA and QUIT commands
     AUTHORIZATION,
     //For PASS and QUIT

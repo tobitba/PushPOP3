@@ -30,7 +30,9 @@ pop_write(struct selector_key *key) {
         buffer_read_adv(datos->writeBuff, n);
         selector_set_interest_key(key, OP_READ);
     }
-    
+    if(datos->stm.current->state == GREETING){
+        return AUTHORIZATION;
+    }
     return datos->stm.current->state; //TODO: estoy es un puente al estado de TRANSACTIONAL, cambiar cuando se tenga manejo de users
 }
 
@@ -72,6 +74,11 @@ void pop_greeting(const unsigned state, struct selector_key *key){
 }
 
 static const struct state_definition pop3_states_handlers[] = {
+    {
+        .state = GREETING,
+        .on_arrival = pop_greeting,  
+        .on_write_ready = pop_write, 
+    },
     {
         .state = AUTHORIZATION,
         .on_arrival = pop_greeting,        
@@ -182,7 +189,7 @@ void pop3_passive_accept(struct selector_key *key){
     buffer_init(datos->readBuff,BUFFER_SIZE,datos->readData);
     datos->writeBuff = malloc(sizeof(struct buffer));
     buffer_init(datos->writeBuff,BUFFER_SIZE,datos->writeData);
-    datos->stm.initial = AUTHORIZATION;
+    datos->stm.initial = GREETING;
     datos->stm.max_state = FINISH;
     datos->stm.states = pop3_states_handlers;
     stm_init(&datos->stm);
