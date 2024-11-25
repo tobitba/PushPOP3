@@ -15,6 +15,7 @@
 #define COMMAND_COUNT 4
 #define SPACE_CHAR 32
 #define ENTER_CHAR '\n'
+#define CARRIAGE_RETURN_CHAR '\r'
 
 #define IS_UPPER_CASE_LETTER(n) ((n) >= 'A' && (n) <= 'Z')
 #define IS_LOWER_CASE_LETTER(n) ((n) >= 'a' && (n) <= 'z')
@@ -128,6 +129,11 @@ Command getCommand(buffer* b, const state current) {
     if (!readCommandArg(command, command->arg1, &(command->isArg1Present), b)) return NULL;
   }
 
+  if (!buffer_can_read(b) || buffer_read(b) != CARRIAGE_RETURN_CHAR) {
+    free(command);
+    return NULL;
+  }
+
   if (!buffer_can_read(b) || buffer_read(b) != ENTER_CHAR) {
     free(command);
     return NULL;
@@ -147,7 +153,7 @@ state runCommand(Command command, pop3* datos) {
 }
 
 static bool readCommandArg(Command command, char* arg, bool* isArgPresent, buffer* b) {
-  if (buffer_peak(b) == ENTER_CHAR) // the argument might be optional, this will leave isArgPresent in false
+  if (buffer_peak(b) == CARRIAGE_RETURN_CHAR) // the argument might be optional, this will leave isArgPresent in false
     return true;
 
   if (!buffer_can_read(b) || buffer_read(b) != SPACE_CHAR) {
@@ -158,7 +164,7 @@ static bool readCommandArg(Command command, char* arg, bool* isArgPresent, buffe
   int j = 0;
   for (; j < MAX_ARG_LENGHT; j++) {
     char c = (char)buffer_peak(b);
-    if (c == SPACE_CHAR || c == ENTER_CHAR) {
+    if (c == SPACE_CHAR || c == CARRIAGE_RETURN_CHAR) {
       if (j == 0) { // The argument after the first space was another space or enter. Ex: USER__ Or User_\n
         free(command);
         return false;
