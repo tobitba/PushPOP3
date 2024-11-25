@@ -118,27 +118,39 @@ Command getCommand(buffer* b, const state current) {
   int i = 0;
   for (; i < MAX_COMMAND_LENGHT && buffer_can_read(b); i++) {
     char c = (char)buffer_read(b);
-    if (!IS_ALPHABET(c)) return NULL;
+    if (!IS_ALPHABET(c)) {
+      buffer_reset(b);
+      return NULL;
+    };
     commandName[i] = c;
   }
   Command command = findCommand(commandName, current);
   if (command == NULL) {
+    buffer_reset(b);
     return NULL;
   }
 
   if (command->argCount > 0) {
-    if (!readCommandArg(command, command->arg1, &(command->isArg1Present), b)) return NULL;
+    if (!readCommandArg(command, command->arg1, &(command->isArg1Present), b)) {
+      free(command);
+      buffer_reset(b);
+      return NULL;
+    }
   }
 
   if (!buffer_can_read(b) || buffer_read(b) != CARRIAGE_RETURN_CHAR) {
     free(command);
+    buffer_reset(b);
     return NULL;
   }
 
   if (!buffer_can_read(b) || buffer_read(b) != ENTER_CHAR) {
     free(command);
+    buffer_reset(b);
     return NULL;
   }
+
+  buffer_reset(b);
   return command;
 }
 
@@ -157,27 +169,23 @@ static bool readCommandArg(Command command, char* arg, bool* isArgPresent, buffe
   if (buffer_peak(b) == CARRIAGE_RETURN_CHAR) // the argument might be optional, this will leave isArgPresent in false
     return true;
 
-  if (!buffer_can_read(b) || buffer_read(b) != SPACE_CHAR) {
-    free(command);
+  if (!buffer_can_read(b) || buffer_read(b) != SPACE_CHAR)
     return false;
-  }
+
 
   int j = 0;
   for (; j < MAX_ARG_LENGHT; j++) {
     char c = (char)buffer_peak(b);
     if (c == SPACE_CHAR || c == CARRIAGE_RETURN_CHAR) {
-      if (j == 0) { // The argument after the first space was another space or enter. Ex: USER__ Or User_\r\n
-        free(command);
+      if (j == 0)  // The argument after the first space was another space or enter. Ex: USER__ Or User_\r\n
         return false;
-      }
       break; // If j != 0, there's a word between the first space and this char, it could be followed by another
              // argument or end there if '\r'
     }
     c = (char)buffer_read(b);
-    if (!IS_PRINTABLE_ASCII(c)) {
-      free(command);
+    if (!IS_PRINTABLE_ASCII(c))
       return false;
-    }
+
     arg[j] = c;
   }
   arg[j] = '\0';
