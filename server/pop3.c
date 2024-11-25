@@ -27,7 +27,7 @@ static unsigned pop_write(struct selector_key* key) {
   if (n < 0) {
     printf("no pude mandar datos : (");
   } else {
-    buffer_read_adv(datos->writeBuff, n);
+    buffer_reset(datos->writeBuff);
     selector_set_interest_key(key, OP_READ);
   }
   if (datos->stm.current->state == GREETING) {
@@ -76,7 +76,6 @@ static const struct state_definition pop3_states_handlers[] = {
   },
   {
     .state = AUTHORIZATION,
-    .on_arrival = pop_greeting,
     .on_read_ready = pop_read,
     .on_write_ready = pop_write,
   },

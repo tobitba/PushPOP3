@@ -12,12 +12,13 @@
 inline void buffer_reset(buffer* b) {
   b->read = b->data;
   b->write = b->data;
+  memset(b->data, 0, b->limit - b->data);
 }
 
 void buffer_init(buffer* b, const size_t n, uint8_t* data) {
   b->data = data;
-  buffer_reset(b);
   b->limit = b->data + n;
+  buffer_reset(b);
 }
 
 inline bool buffer_can_write(buffer* b) {

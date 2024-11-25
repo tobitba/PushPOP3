@@ -9,7 +9,7 @@
 #include <string.h>
 #include <strings.h>
 
-#define OK "+OK\n\r\0"
+#define OK "+OK\r\n"
 #define MAX_COMMAND_LENGHT 4
 #define MAX_ARG_LENGHT 40
 #define COMMAND_COUNT 4
@@ -154,19 +154,19 @@ Command getCommand(buffer* b, const state current) {
   return command;
 }
 
-state runCommand(Command command, pop3* datos) {
+state runCommand(Command command, pop3* data) {
   if (command == NULL) {
     return ERROR;
   }
 
   printf("Running command: %s\n", command->command_name);
-  state newState = command->execute(datos, command->arg1, command->isArg1Present);
+  state newState = command->execute(data, command->arg1, command->isArg1Present);
   free(command);
   return newState;
 }
 
 static bool readCommandArg(Command command, char* arg, bool* isArgPresent, buffer* b) {
-  if (buffer_peak(b) == CARRIAGE_RETURN_CHAR) // the argument might be optional, this will leave isArgPresent in false
+  if (buffer_can_read(b) && buffer_peak(b) == CARRIAGE_RETURN_CHAR) // the argument might be optional, this will leave isArgPresent in false
     return true;
 
   if (!buffer_can_read(b) || buffer_read(b) != SPACE_CHAR)
@@ -175,6 +175,9 @@ static bool readCommandArg(Command command, char* arg, bool* isArgPresent, buffe
 
   int j = 0;
   for (; j < MAX_ARG_LENGHT; j++) {
+    if (!buffer_can_read(b))
+      return false;
+
     char c = (char)buffer_peak(b);
     if (c == SPACE_CHAR || c == CARRIAGE_RETURN_CHAR) {
       if (j == 0)  // The argument after the first space was another space or enter. Ex: USER__ Or User_\r\n
