@@ -53,6 +53,7 @@ state noopHandler(pop3* data, char* arg1, bool isArgPresent) {
 state userHandler(pop3* data, char* arg1, bool isArg1Present) {
   puts("User handler");
   if (!isArg1Present) {
+    printf("No a valid command name\n");
     return ERROR;
   }
   if (data->user.name == NULL) {
@@ -165,12 +166,12 @@ static bool readCommandArg(Command command, char* arg, bool* isArgPresent, buffe
   for (; j < MAX_ARG_LENGHT; j++) {
     char c = (char)buffer_peak(b);
     if (c == SPACE_CHAR || c == CARRIAGE_RETURN_CHAR) {
-      if (j == 0) { // The argument after the first space was another space or enter. Ex: USER__ Or User_\n
+      if (j == 0) { // The argument after the first space was another space or enter. Ex: USER__ Or User_\r\n
         free(command);
         return false;
       }
       break; // If j != 0, there's a word between the first space and this char, it could be followed by another
-             // argument or end there if '\n'
+             // argument or end there if '\r'
     }
     c = (char)buffer_read(b);
     if (!IS_PRINTABLE_ASCII(c)) {
