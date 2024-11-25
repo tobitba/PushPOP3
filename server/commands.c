@@ -46,6 +46,7 @@ void writeOnUserBuffer(buffer* b, char* str){
 }
 
 state userHandler(pop3 * datos, char* arg1, bool isArg1Present){
+    puts("User handler");
     if(!isArg1Present) {
         return ERROR;
     }
@@ -58,19 +59,18 @@ state userHandler(pop3 * datos, char* arg1, bool isArg1Present){
 }
 
 state passHandler(pop3 * datos, char* arg1, bool isArg1Present){
-    printf("passHAndler\n");
+    puts("Pass handler");
     if(!isArg1Present) {
         return ERROR;
     }
     if(isUserAndPassValid(datos->user.name,arg1)){
-         printf("passHAndler adentro if\n");
         if(datos->user.pass == NULL){
             datos->user.pass = calloc(1,MAX_ARG_LENGHT);
         }
         strcpy(datos->user.pass, arg1);        
         //TODO: armar estructura de mails del user y verificar dirs...
         writeOnUserBuffer(datos->writeBuff, "+OK maildrop locked and ready\r\n");
-        return TRANSACTION; //User loghged succesfully
+        return TRANSACTION; //User logged succesfully
     }
      printf("ret errorr :(  la pass recibida es: %s\n", arg1);
    return ERROR; //TODO: add error msg
@@ -113,17 +113,13 @@ Command getCommand(buffer *b, const state current) {
     //los comandos en pop3 son de 4 caracteres (case insensitive)
     char commandName[MAX_COMMAND_LENGHT + 1] = {0};
     int i = 0;
-    printf("getcommand\n");
     for (; i < MAX_COMMAND_LENGHT && buffer_can_read(b); i++) {
         char c = (char) buffer_read(b);
         if (!IS_ALPHABET(c))
             return NULL;
         commandName[i] = c;
-        printf("for c = %c\n",c);
     }
-     printf("name %s\n", commandName);
     Command command = findCommand(commandName, current);
-    printf("find commandpasado %s  \n", command->command_name);
     if (command == NULL) {
         return NULL;
     }
