@@ -6,10 +6,10 @@
 #define MAX_USERS 10
 #define MAX_ARG_LENGHT 40
 
-struct users {
+typedef struct User {
   char* name;
   char* pass;
-};
+} User;
 
 struct doh {
   char* host;
@@ -29,7 +29,7 @@ struct pop3args {
   bool disectors_enabled;
 
   struct doh doh;
-  struct users users[MAX_USERS];
+  User users[MAX_USERS];
   int user_count;
 };
 

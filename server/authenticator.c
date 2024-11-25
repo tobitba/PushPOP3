@@ -3,10 +3,10 @@
 #include <stdio.h>
 #include <string.h>
 
-static struct users* userList;
+static User* userList;
 static int userCount;
 
-void init_authenticator(struct users* newUsers, int newUserCount) {
+void init_authenticator(User* newUsers, int newUserCount) {
   userList = newUsers;
   userCount = newUserCount;
 }

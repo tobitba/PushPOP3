@@ -31,7 +31,7 @@ typedef struct pop3 {
   struct state_machine stm;
   uint8_t writeData[BUFFER_SIZE], readData[BUFFER_SIZE];
   buffer *writeBuff, *readBuff;
-  struct users user;
+  User user;
 } pop3;
 
 void pop3_passive_accept(struct selector_key* key);

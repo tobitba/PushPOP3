@@ -19,7 +19,7 @@ static unsigned short port(const char* s) {
   return (unsigned short)sl;
 }
 
-static void user(char* s, struct users* user) {
+static void user(char* s, User* user) {
   char* p = strchr(s, ':');
   if (p == NULL) {
     fprintf(stderr, "password not found\n");

@@ -2,7 +2,7 @@
 #define AUTHENTICATOR_H
 #include "../include/args.h"
 
-void init_authenticator(struct users* userSet, int newUserCount);
+void init_authenticator(User* userSet, int newUserCount);
 
 /**
  * @param user : the username to validate
