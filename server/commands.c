@@ -51,7 +51,7 @@ state userHandler(pop3 * datos, char* arg1, char* arg2){
     }
     strcpy(datos->user.name, arg1);
     writeOnUserBuffer(datos->writeBuff, OK);
-    return AUTHORIZATION;//auth_pass
+    return AUTHORIZATION_PASS;
 }
 
 state passHandler(pop3 * datos, char* arg1, char* arg2){
@@ -81,7 +81,7 @@ state stat_handler(pop3* data, char* arg1, char* arg2) {
 
 static const CommandCDT commands[COMMAND_COUNT] = {
     { .state = AUTHORIZATION, .command_name = "USER" , .execute = userHandler, .argCount = 1 },
-    { .state = AUTHORIZATION, .command_name = "PASS" , .execute = passHandler, .argCount = 1 },
+    { .state = AUTHORIZATION_PASS, .command_name = "PASS" , .execute = passHandler, .argCount = 1 },
     { .state = TRANSACTION, .command_name = "STAT" , .execute = stat_handler, .argCount = 0 },
 };
 

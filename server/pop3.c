@@ -79,6 +79,11 @@ static const struct state_definition pop3_states_handlers[] = {
         .on_write_ready = pop_write, 
     },
     {
+        .state = AUTHORIZATION_PASS,     
+        .on_read_ready = pop_read,  
+        .on_write_ready = pop_write, 
+    },
+    {
         .state = TRANSACTION,
         .on_write_ready = pop_write,
         .on_read_ready = pop_read,

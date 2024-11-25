@@ -11,8 +11,10 @@
 
 enum pop3_states
 {
-    // For USER, PASS, CAPA and QUIT commands
+    // For USER,  CAPA and QUIT commands
     AUTHORIZATION,
+    //For PASS and QUIT
+    AUTHORIZATION_PASS,
     // For bla bla commands
     TRANSACTION,
     // MUst delete all dell mails and quit
