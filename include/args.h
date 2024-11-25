@@ -7,30 +7,30 @@
 #define MAX_ARG_LENGHT 40
 
 struct users {
-    char *name;
-    char *pass;
+  char* name;
+  char* pass;
 };
 
 struct doh {
-    char           *host;
-    char           *ip;
-    unsigned short  port;
-    char           *path;
-    char           *query;
+  char* host;
+  char* ip;
+  unsigned short port;
+  char* path;
+  char* query;
 };
 
 struct pop3args {
-    char           *socks_addr; //TODO, revisar bien...
-    unsigned short  socks_port;
+  char* socks_addr; // TODO: revisar bien...
+  unsigned short socks_port;
 
-    char *          mng_addr;
-    unsigned short  mng_port;
+  char* mng_addr;
+  unsigned short mng_port;
 
-    bool            disectors_enabled;
+  bool disectors_enabled;
 
-    struct doh      doh;
-    struct users    users[MAX_USERS];
-    int user_count;
+  struct doh doh;
+  struct users users[MAX_USERS];
+  int user_count;
 };
 
 /**
@@ -38,8 +38,6 @@ struct pop3args {
  * args con defaults o la seleccion humana. Puede cortar
  * la ejecución.
  */
-void 
-parse_args(const int argc, char **argv, struct pop3args *args);
+void parse_args(const int argc, char** argv, struct pop3args* args);
 
 #endif
-

@@ -1,5 +1,5 @@
-#ifndef AUTHENTICATOR
-#define AUTHENTICATOR
+#ifndef AUTHENTICATOR_H
+#define AUTHENTICATOR_H
 #include "../include/args.h"
 
 void init_authenticator(struct users* userSet, int newUserCount);
@@ -10,6 +10,5 @@ void init_authenticator(struct users* userSet, int newUserCount);
  * @return 1 if user and pass is valid, else 0
  */
 int isUserAndPassValid(char* user, char* pass);
-
 
 #endif

@@ -1,0 +1,109 @@
+#include <dirent.h>
+#include <errno.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/stat.h>
+
+typedef enum { NEW, READ, DELETED } MailState;
+
+typedef struct Mail {
+  unsigned number;
+  char* path;
+  int nbytes;
+  MailState state;
+} Mail;
+
+typedef struct {
+  Mail* array;
+  int length;
+} MailArray;
+
+Mail* initUserMails(char* username, char* maildir) {
+  // quiero recorrer los mails en la carpeta
+  MailArray* mailArray = malloc(sizeof(MailArray));
+  mailArray->array = malloc(sizeof(Mail*) * mailCount);
+  mailArray->length = mailCount;
+}
+
+int mailArrayGetTotalSize() {
+}
+
+int recReading(char* str, unsigned int spacing);
+
+// Main de prueba para la elaboracion del tree
+/*
+int main(int argc,char* argv[]){
+    printf("%s\n",argv[1]);
+    printf("%d\n",stat(argv[1],&buf));
+    dir = opendir(argv[1]);
+    if (dir == NULL)
+        printf("It's empty\n");
+    if (errno != 0)
+        perror("error reading directory");
+
+    while ((dp = readdir (dir)) != NULL) {
+        if ( (strcmp(dp->d_name,".") == 0) || (strcmp(dp->d_name,"..") == 0) )
+            continue;
+        printf("found %s\n", dp->d_name);
+        // 8 es archivo y 4 carpeta
+        printf("type %s\n", dp->d_type==8?"F":"D");
+        if ( dp->d_type==4 ){
+            dir2 = opendir(dp->d_name);
+            if (dir2==NULL)
+                return 0;
+            printf("aca\n");
+        }
+
+    }
+
+    return 0;
+}
+*/
+
+struct stat buf;
+
+int main(int argc, char* argv[]) {
+  errno = 0;
+  unsigned int spacing = 2;
+  printf("%s\n", argv[1]);
+  return recReading(argv[1], spacing);
+}
+
+int recReading(char* str, unsigned int spacing) {
+  DIR* dir;
+  struct dirent* dp;
+  dir = opendir(str);
+  int toReturn = 1;
+  if (dir == NULL) {
+    switch (errno) {
+    case ENOENT:
+      printf("The directory dirname does not exist\n");
+      return 0;
+    case ENOTDIR:
+      printf("Some component of the dirname pathname is not a directory");
+      return 0;
+    default:
+      break;
+    }
+  }
+  while ((dp = readdir(dir)) != NULL) {
+    if ((strcmp(dp->d_name, ".") == 0) || (strcmp(dp->d_name, "..") == 0)) continue;
+    // 8 es archivo y 4 carpeta
+    printf("%s", dp->d_type == 8 ? "F" : "D");
+    char space[spacing]; // como signar los espacios?
+    /*
+    int a = 0;
+    while(a < spacing){
+        space[a] = ' ';
+        a++;
+    }
+   */
+    char* output = strcat(space, dp->d_name);
+    printf("%s\n", output);
+    if (dp->d_type == 4) {
+      toReturn = toReturn && recReading(dp->d_name, spacing + 2);
+    }
+  }
+
+  return toReturn;
+}
