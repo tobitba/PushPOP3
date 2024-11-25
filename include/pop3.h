@@ -1,7 +1,9 @@
 #ifndef POP3_H
 #define POP3_H
+
 #include "args.h"
 #include "buffer.h"
+#include "maildir.h"
 #include "selector.h"
 #include "stm.h"
 #include <netdb.h>
@@ -25,28 +27,6 @@ enum pop3_states {
   FINISH,
 };
 
-// ==============
-// Temp Structure
-typedef enum { NEW, READ, DELETED } MailState;
-
-typedef struct Mail {
-  unsigned number;
-  const char* path;
-  int nbytes;
-  MailState state;
-} Mail;
-
-typedef struct {
-  Mail* array;
-  int length;
-} MailArray;
-
-MailArray* maildirInit(char* username, char* maildir);
-void maildirFree(MailArray* mailArray);
-int maildirGetTotalSize();
-// Temp Structure
-// ==============
-
 typedef enum pop3_states state;
 
 typedef struct pop3 {
@@ -54,7 +34,7 @@ typedef struct pop3 {
   uint8_t writeData[BUFFER_SIZE], readData[BUFFER_SIZE];
   buffer *writeBuff, *readBuff;
   User user;
-  Mail mail;
+  MailArray* mails;
 } pop3;
 
 void pop3_passive_accept(struct selector_key* key);

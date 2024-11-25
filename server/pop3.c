@@ -1,6 +1,7 @@
 #include "../include/pop3.h"
 #include "../include/buffer.h"
 #include "../include/commands.h"
+#include "../include/maildir.h"
 #include "../include/selector.h"
 #include "../include/stm.h"
 #include <stdint.h>
@@ -139,6 +140,7 @@ static void pop3_close(struct selector_key* key) {
   free(toFree->readBuff);
   free(toFree->user.name);
   free(toFree->user.pass);
+  if (toFree->mails != NULL) maildirFree(toFree->mails);
   free(toFree);
 
   // socks5_destroy(ATTACHMENT(key)); TODO
@@ -171,6 +173,7 @@ void pop3_passive_accept(struct selector_key* key) {
   datos->stm.states = pop3_states_handlers;
   stm_init(&datos->stm);
   printf("agrego a selector\n");
+  datos->mails = NULL;
 
   if (SELECTOR_SUCCESS != selector_register(key->s, client, &pop3_handler, OP_WRITE, datos)) {
     goto fail;
