@@ -12,7 +12,7 @@
 #define OK "+OK\n\r\0"
 #define MAX_COMMAND_LENGHT 4
 #define MAX_ARG_LENGHT 40
-#define COMMAND_COUNT 3
+#define COMMAND_COUNT 4
 #define SPACE_CHAR 32
 #define ENTER_CHAR '\n'
 
@@ -23,7 +23,7 @@
 // from "!"(33) to "~"(126)
 #define IS_PRINTABLE_ASCII(n) ((n) >= '!' && (n) <= '~')
 
-typedef state (*handler) (pop3 * datos, char* arg1, bool isArg1Present);
+typedef state (*handler) (pop3 * data, char* arg1, bool isArg1Present);
 
 typedef struct CommandCDT
 {
@@ -45,31 +45,37 @@ void writeOnUserBuffer(buffer* b, char* str){
 
 }
 
-state userHandler(pop3 * datos, char* arg1, bool isArg1Present){
+state noopHandler(pop3 * data, char* arg1, bool isArgPresent) {
+    puts("Noop handler");
+    writeOnUserBuffer(data->writeBuff, OK);
+    return TRANSACTION;
+}
+
+state userHandler(pop3 * data, char* arg1, bool isArg1Present){
     puts("User handler");
     if(!isArg1Present) {
         return ERROR;
     }
-    if(datos->user.name == NULL){
-        datos->user.name = calloc(1,MAX_ARG_LENGHT);
+    if(data->user.name == NULL){
+        data->user.name = calloc(1,MAX_ARG_LENGHT);
     }
-    strcpy(datos->user.name, arg1);
-    writeOnUserBuffer(datos->writeBuff, OK);
+    strcpy(data->user.name, arg1);
+    writeOnUserBuffer(data->writeBuff, OK);
     return AUTHORIZATION_PASS;
 }
 
-state passHandler(pop3 * datos, char* arg1, bool isArg1Present){
+state passHandler(pop3 * data, char* arg1, bool isArg1Present){
     puts("Pass handler");
     if(!isArg1Present) {
         return ERROR;
     }
-    if(isUserAndPassValid(datos->user.name,arg1)){
-        if(datos->user.pass == NULL){
-            datos->user.pass = calloc(1,MAX_ARG_LENGHT);
+    if(isUserAndPassValid(data->user.name,arg1)){
+        if(data->user.pass == NULL){
+            data->user.pass = calloc(1,MAX_ARG_LENGHT);
         }
-        strcpy(datos->user.pass, arg1);        
+        strcpy(data->user.pass, arg1);
         //TODO: armar estructura de mails del user y verificar dirs...
-        writeOnUserBuffer(datos->writeBuff, "+OK maildrop locked and ready\r\n");
+        writeOnUserBuffer(data->writeBuff, "+OK maildrop locked and ready\r\n");
         return TRANSACTION; //User logged succesfully
     }
      printf("ret errorr :(  la pass recibida es: %s\n", arg1);
@@ -89,6 +95,7 @@ static const CommandCDT commands[COMMAND_COUNT] = {
     { .state = AUTHORIZATION, .command_name = "USER" , .execute = userHandler, .argCount = 1 },
     { .state = AUTHORIZATION_PASS, .command_name = "PASS" , .execute = passHandler, .argCount = 1 },
     { .state = TRANSACTION, .command_name = "STAT" , .execute = stat_handler, .argCount = 0 },
+    { .state = TRANSACTION, .command_name = "NOOP", .execute = noopHandler, .argCount = 0 },
 };
 
 static Command findCommand(const char* name, const state current) {

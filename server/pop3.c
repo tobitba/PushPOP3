@@ -59,9 +59,6 @@ static unsigned pop_read(struct selector_key *key){
             return newState;
         }
     }
-    
-
-
     return datos->stm.current->state;
 }
 
