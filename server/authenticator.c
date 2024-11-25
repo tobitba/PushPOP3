@@ -6,7 +6,7 @@
 static User* userList;
 static int userCount;
 
-void init_authenticator(User* newUsers, int newUserCount) {
+void initAuthenticator(User* newUsers, int newUserCount) {
   userList = newUsers;
   userCount = newUserCount;
 }

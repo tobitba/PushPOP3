@@ -20,15 +20,15 @@ struct doh {
 };
 
 struct pop3args {
-  char* socks_addr; // TODO: revisar bien...
-  unsigned short socks_port;
+  char* socksAddr; // TODO: revisar bien...
+  unsigned short socksPort;
 
-  char* mng_addr;
-  unsigned short mng_port;
+  char* mngAddr;
+  unsigned short mngPort;
 
   struct doh doh;
   User users[MAX_USERS];
-  int user_count;
+  int userCount;
 
   const char* maildirPath;
 };

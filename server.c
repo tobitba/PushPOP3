@@ -14,6 +14,7 @@
 #include <limits.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,24 +27,21 @@
 
 #include "include/args.h"
 #include "include/authenticator.h"
-#include "include/buffer.h"
 #include "include/pop3.h"
 #include "include/selector.h"
 
 static bool done = false;
 
-static void sigterm_handler(const int signal) {
+static void sigtermHandler(const int signal) {
   printf("signal %d, cleaning up and exiting\n", signal);
   done = true;
 }
-
-void socksv5_passive_accept(struct selector_key* key);
 
 int main(int argc, char** argv) {
 
   struct pop3args args;
   parse_args(argc, argv, &args);
-  init_authenticator(args.users, args.user_count);
+  initAuthenticator(args.users, args.userCount);
 
   unsigned pop3_port = 2252;
   // unsigned configurator_port = 2254;
@@ -87,8 +85,8 @@ int main(int argc, char** argv) {
 
   // registrar sigterm es útil para terminar el programa normalmente.
   // esto ayuda mucho en herramientas como valgrind.
-  signal(SIGTERM, sigterm_handler);
-  signal(SIGINT, sigterm_handler);
+  signal(SIGTERM, sigtermHandler);
+  signal(SIGINT, sigtermHandler);
 
   if (selector_fd_set_nio(server) == -1) {
     err_msg = "getting server socket flags";

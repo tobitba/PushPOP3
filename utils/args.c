@@ -75,11 +75,11 @@ static void usage(const char* progname) {
 void parse_args(const int argc, char** argv, struct pop3args* args) {
   memset(args, 0, sizeof(*args)); // sobre todo para setear en null los punteros de users
 
-  args->socks_addr = "0.0.0.0";
-  args->socks_port = 1080;
+  args->socksAddr = "0.0.0.0";
+  args->socksPort = 1080;
 
-  args->mng_addr = "127.0.0.1";
-  args->mng_port = 8080;
+  args->mngAddr = "127.0.0.1";
+  args->mngPort = 8080;
 
   args->doh.host = "localhost";
   args->doh.ip = "127.0.0.1";
@@ -108,16 +108,16 @@ void parse_args(const int argc, char** argv, struct pop3args* args) {
       usage(argv[0]);
       break;
     case 'l':
-      args->socks_addr = optarg;
+      args->socksAddr = optarg;
       break;
     case 'L':
-      args->mng_addr = optarg;
+      args->mngAddr = optarg;
       break;
     case 'p':
-      args->socks_port = port(optarg);
+      args->socksPort = port(optarg);
       break;
     case 'P':
-      args->mng_port = port(optarg);
+      args->mngPort = port(optarg);
       break;
     case 'u':
       if (nusers >= MAX_USERS) {
