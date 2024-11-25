@@ -40,7 +40,7 @@ static void sigtermHandler(const int signal) {
 int main(int argc, char** argv) {
 
   struct pop3args args;
-  parse_args(argc, argv, &args);
+  parseArgs(argc, argv, &args);
   initAuthenticator(args.users, args.userCount);
 
   unsigned pop3_port = 2252;
