@@ -4,9 +4,7 @@
 
 #include "../include/selector.h"
 #include <assert.h> // :)
-#include <bits/pthreadtypes.h>
-#include <bits/types/sigset_t.h>
-#include <errno.h> // :)
+#include <errno.h>  // :)
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
@@ -15,9 +13,6 @@
 #include <stdlib.h> // malloc
 #include <string.h> // memset
 #include <sys/select.h>
-#include <sys/signal.h>
-#include <sys/socket.h>
-#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 
