@@ -6,9 +6,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
+
+#include "../include/authenticator.h"
+#include <stdlib.h>
+#define OK "+OK\n\r\0"
 #define MAX_COMMAND_LENGHT 4
 #define MAX_ARG_LENGHT 40
-#define COMMAND_COUNT 2
+#define COMMAND_COUNT 3
 #define SPACE_CHAR 32
 #define ENTER_CHAR '\n'
 
@@ -33,10 +37,39 @@ typedef struct CommandCDT
 
 static bool readCommandArg(Command command, char * arg, buffer * b);
 
-state user_handler(pop3 * datos, char* arg1, char* arg2){
-    printf("user handler\n");
-    return AUTHORIZATION;
+void writeOnUserBuffer(buffer* b, char* str){
+    size_t lenght;
+    uint8_t *buf = buffer_write_ptr(b, &lenght);
+    memcpy(buf, str, strlen(str)+1);
+    buffer_write_adv(b, lenght);
+
 }
+
+state userHandler(pop3 * datos, char* arg1, char* arg2){
+    if(datos->user.name == NULL){
+        datos->user.name = calloc(1,MAX_ARG_LENGHT);
+    }
+    strcpy(datos->user.name, arg1);
+    writeOnUserBuffer(datos->writeBuff, OK);
+    return AUTHORIZATION;//auth_pass
+}
+
+state passHandler(pop3 * datos, char* arg1, char* arg2){
+    printf("passHAndler\n");
+    if(isUserAndPassValid(datos->user.name,arg1)){
+         printf("passHAndler adentro if\n");
+        if(datos->user.pass == NULL){
+            datos->user.pass = calloc(1,MAX_ARG_LENGHT);
+        }
+        strcpy(datos->user.pass, arg1);        
+        //TODO: armar estructura de mails del user y verificar dirs...
+        writeOnUserBuffer(datos->writeBuff, "+OK maildrop locked and ready\r\n");
+        return TRANSACTION; //User loghged succesfully
+    }
+     printf("ret errorr :(  la pass recibida es: %s\n", arg1);
+   return ERROR; //TODO: add error msg
+}
+
 
 state stat_handler(pop3* data, char* arg1, char* arg2) {
     // manejar stat
@@ -47,7 +80,8 @@ state stat_handler(pop3* data, char* arg1, char* arg2) {
 
 
 static const CommandCDT commands[COMMAND_COUNT] = {
-    { .state = AUTHORIZATION, .command_name = "USER" , .execute = user_handler, .argCount = 1 },
+    { .state = AUTHORIZATION, .command_name = "USER" , .execute = userHandler, .argCount = 1 },
+    { .state = AUTHORIZATION, .command_name = "PASS" , .execute = passHandler, .argCount = 1 },
     { .state = TRANSACTION, .command_name = "STAT" , .execute = stat_handler, .argCount = 0 },
 };
 
@@ -72,13 +106,17 @@ Command getCommand(buffer *b, const state current) {
     //los comandos en pop3 son de 4 caracteres (case insensitive)
     char commandName[MAX_COMMAND_LENGHT + 1] = {0};
     int i = 0;
+    printf("getcommand\n");
     for (; i < MAX_COMMAND_LENGHT && buffer_can_read(b); i++) {
         char c = (char) buffer_read(b);
         if (!IS_ALPHABET(c))
             return NULL;
         commandName[i] = c;
+        printf("for c = %c\n",c);
     }
+     printf("name %s\n", commandName);
     Command command = findCommand(commandName, current);
+    printf("find commandpasado %s  \n", command->command_name);
     if (command == NULL) {
         return NULL;
     }

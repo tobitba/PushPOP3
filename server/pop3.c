@@ -12,7 +12,7 @@ static unsigned
 pop_write(struct selector_key *key) {
     pop3* datos = key->data;
     size_t count;
-    uint8_t* ptr = buffer_read_ptr(datos->buff, &count);
+    uint8_t* ptr = buffer_read_ptr(datos->writeBuff, &count);
 
     const ssize_t n = send(key->fd, ptr,count, MSG_NOSIGNAL);
     if (n == -1)
@@ -27,11 +27,11 @@ pop_write(struct selector_key *key) {
         printf("no pude mandar datos : (");
     }else
     {
-        buffer_read_adv(datos->buff, n);
+        buffer_read_adv(datos->writeBuff, n);
         selector_set_interest_key(key, OP_READ);
     }
     
-    return TRANSACTION; //TODO: estoy es un puente al estado de TRANSACTIONAL, cambiar cuando se tenga manejo de users
+    return datos->stm.current->state; //TODO: estoy es un puente al estado de TRANSACTIONAL, cambiar cuando se tenga manejo de users
 }
 
 
@@ -40,44 +40,42 @@ pop_write(struct selector_key *key) {
 static unsigned pop_read(struct selector_key *key){
     pop3* datos = ATTACHMENT(key);
     size_t count;
-    uint8_t* ptr = buffer_write_ptr(datos->buff, &count);
+    uint8_t* ptr = buffer_write_ptr(datos->readBuff, &count);
     ssize_t n = recv(key->fd, ptr, count, 0);
+     printf("read\n");
     if(n <= 0)
     {
         return ERROR;
     }else{
-      	buffer_write_adv(datos->buff, n);
-		Command command = getCommand(datos->buff, datos->stm.current->state);
+      	buffer_write_adv(datos->readBuff, n);
+		Command command = getCommand(datos->readBuff, datos->stm.current->state);
+        printf("ptest %d\n", command == NULL);
         if(command != NULL){
         	state newState = runCommand(command, datos);
-        	printf("%d\n", newState);
+        	printf("nyuevo estado: !!!%d\n", newState);
+            selector_set_interest_key(key, OP_WRITE);
+            return newState;
         }
     }
     
-    selector_set_interest_key(key, OP_WRITE);
 
 
-    return 0;
+    return datos->stm.current->state;
 }
 
 void pop_greeting(const unsigned state, struct selector_key *key){
     size_t lenght;
-    char greeting[] = "+OK PushPOP3 server is here for you\r\n";
-    uint8_t *buf = buffer_write_ptr(ATTACHMENT(key)->buff, &lenght);
-    memcpy(buf, greeting, strlen(greeting));
-    buffer_write_adv(ATTACHMENT(key)->buff, lenght);
-}
-
-static unsigned test(struct selector_key *key){
-    pop_greeting(AUTHORIZATION,key);
-    return TRANSACTION;
+    char greeting[] = "+OK PushPop3\r\n";
+    uint8_t *buf = buffer_write_ptr(ATTACHMENT(key)->writeBuff, &lenght);
+    memcpy(buf, greeting, strlen(greeting)+1);
+    buffer_write_adv(ATTACHMENT(key)->writeBuff, lenght);
 }
 
 static const struct state_definition pop3_states_handlers[] = {
     {
         .state = AUTHORIZATION,
         .on_arrival = pop_greeting,        
-        .on_read_ready = test,  
+        .on_read_ready = pop_read,  
         .on_write_ready = pop_write, 
     },
     {
@@ -144,7 +142,8 @@ pop3_block(struct selector_key *key) {
 static void
 pop3_close(struct selector_key *key) {
     pop3* toFree = ATTACHMENT(key);
-    free(toFree->buff);
+    free(toFree->writeBuff);
+    free(toFree->readBuff);
     free(toFree);
 
     //socks5_destroy(ATTACHMENT(key)); TODO
@@ -174,8 +173,10 @@ void pop3_passive_accept(struct selector_key *key){
         goto fail;
     }
     datos = calloc(1,sizeof(pop3));
-    datos->buff = malloc(sizeof(struct buffer));
-    buffer_init(datos->buff,BUFFER_SIZE,datos->raw_buff);
+    datos->readBuff = malloc(sizeof(struct buffer));
+    buffer_init(datos->readBuff,BUFFER_SIZE,datos->readData);
+    datos->writeBuff = malloc(sizeof(struct buffer));
+    buffer_init(datos->writeBuff,BUFFER_SIZE,datos->writeData);
     datos->stm.initial = AUTHORIZATION;
     datos->stm.max_state = FINISH;
     datos->stm.states = pop3_states_handlers;

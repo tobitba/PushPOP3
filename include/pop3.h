@@ -29,8 +29,8 @@ typedef enum pop3_states state;
 typedef struct pop3
 {
     struct state_machine stm;
-    uint8_t raw_buff[BUFFER_SIZE];
-    buffer *buff;
+    uint8_t writeData[BUFFER_SIZE], readData[BUFFER_SIZE];
+    buffer *writeBuff, *readBuff;
     struct users user;
 
 } pop3;
