@@ -23,7 +23,7 @@
 // from "!"(33) to "~"(126)
 #define IS_PRINTABLE_ASCII(n) ((n) >= '!' && (n) <= '~')
 
-typedef state (*handler) (pop3 * datos, char* arg1, char* arg2);
+typedef state (*handler) (pop3 * datos, char* arg1, bool isArg1Present);
 
 typedef struct CommandCDT
 {
@@ -32,10 +32,10 @@ typedef struct CommandCDT
     handler execute; 
     int argCount;
     char arg1[MAX_ARG_LENGHT + 1];
-    char arg2[MAX_ARG_LENGHT + 1];
+    bool isArg1Present;
 } CommandCDT;
 
-static bool readCommandArg(Command command, char * arg, buffer * b);
+static bool readCommandArg(Command command, char * arg, bool * isArgPresent ,buffer * b);
 
 void writeOnUserBuffer(buffer* b, char* str){
     size_t lenght;
@@ -45,7 +45,10 @@ void writeOnUserBuffer(buffer* b, char* str){
 
 }
 
-state userHandler(pop3 * datos, char* arg1, char* arg2){
+state userHandler(pop3 * datos, char* arg1, bool isArg1Present){
+    if(!isArg1Present) {
+        return ERROR;
+    }
     if(datos->user.name == NULL){
         datos->user.name = calloc(1,MAX_ARG_LENGHT);
     }
@@ -54,8 +57,11 @@ state userHandler(pop3 * datos, char* arg1, char* arg2){
     return AUTHORIZATION_PASS;
 }
 
-state passHandler(pop3 * datos, char* arg1, char* arg2){
+state passHandler(pop3 * datos, char* arg1, bool isArg1Present){
     printf("passHAndler\n");
+    if(!isArg1Present) {
+        return ERROR;
+    }
     if(isUserAndPassValid(datos->user.name,arg1)){
          printf("passHAndler adentro if\n");
         if(datos->user.pass == NULL){
@@ -71,7 +77,7 @@ state passHandler(pop3 * datos, char* arg1, char* arg2){
 }
 
 
-state stat_handler(pop3* data, char* arg1, char* arg2) {
+state stat_handler(pop3* data, char* arg1, bool isArg1Present) {
     // manejar stat
     // +OK <num_msg> <size_mailbox_in_octet>
     printf("stat handler\n");
@@ -95,6 +101,7 @@ static Command findCommand(const char* name, const state current) {
             strncpy(command->command_name, name, MAX_COMMAND_LENGHT + 1);
             command->execute = commands[i].execute;
             command->argCount = commands[i].argCount;
+            command->isArg1Present = false;
             return command;
         }
     }
@@ -122,14 +129,10 @@ Command getCommand(buffer *b, const state current) {
     }
 
     if (command->argCount > 0) {
-        if (!readCommandArg(command, command->arg1, b))
+        if (!readCommandArg(command, command->arg1, &(command->isArg1Present), b))
             return NULL;
     }
 
-    if (command->argCount > 1) {
-        if (!readCommandArg(command, command->arg2, b))
-            return NULL;
-    }
     if (!buffer_can_read(b) || buffer_read(b) != ENTER_CHAR) {
         free(command);
         return NULL;
@@ -143,16 +146,20 @@ state runCommand(Command command, pop3* datos) {
     }
 
     printf("Running command: %s\n", command->command_name);
-    state newState = command->execute(datos, command->arg1, command->arg2);
+    state newState = command->execute(datos, command->arg1, command->isArg1Present);
     free(command);
     return newState;
 }
 
-static bool readCommandArg(Command command, char * arg, buffer * b) {
+static bool readCommandArg(Command command, char * arg, bool * isArgPresent ,buffer * b) {
+    if (buffer_peak(b) == ENTER_CHAR) // the argument might be optional, this will leave isArgPresent in false
+        return true;
+
     if (!buffer_can_read(b) || buffer_read(b) != SPACE_CHAR) {
         free(command);
         return false;
     }
+
     int j = 0;
     for (; j < MAX_ARG_LENGHT; j++) {
         char c = (char) buffer_peak(b);
@@ -171,5 +178,6 @@ static bool readCommandArg(Command command, char * arg, buffer * b) {
         arg[j] = c;
     }
     arg[j] = '\0';
+    *isArgPresent = true;
     return true;
 }

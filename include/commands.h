@@ -3,7 +3,7 @@
 
 #include "pop3.h"
 
-typedef state (*handler) (pop3 * datos, char* arg1, char* arg2);
+typedef state (*handler) (pop3 * datos, char* arg1, bool isArg1Present); // we could add more argument if needed, and maybe mix arg1 and the bool in an struct
 
 typedef struct CommandCDT * Command;
 
