@@ -43,8 +43,8 @@ int main(int argc, char** argv) {
   parseArgs(argc, argv, &args);
   initAuthenticator(args.users, args.userCount);
 
-  unsigned pop3_port = 2252;
-  unsigned configurator_port = 2254;
+  unsigned pop3_port = args.pop3Port;
+  unsigned configurator_port = args.push3Port;
 
 
   // no tenemos nada que leer de stdin

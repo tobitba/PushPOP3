@@ -20,11 +20,11 @@ struct doh {
 };
 
 typedef struct {
-  char* socksAddr; // TODO: revisar bien...
-  unsigned short socksPort;
+  char* pop3Addr; // TODO: revisar bien...
+  unsigned short pop3Port;
 
-  char* mngAddr;
-  unsigned short mngPort;
+  char* push3Addr;
+  unsigned short push3Port;
 
   struct doh doh;
   User users[MAX_USERS];

@@ -5,6 +5,7 @@
 #include <stdlib.h> /* for exit */
 #include <string.h> /* memset */
 #include <sys/stat.h>
+#include <netinet/in.h>
 
 #include "../include/args.h"
 
@@ -75,11 +76,11 @@ static void usage(const char* progname) {
 void parseArgs(const int argc, char** argv, pop3args* args) {
   memset(args, 0, sizeof(*args)); // sobre todo para setear en null los punteros de users
 
-  args->socksAddr = "0.0.0.0";
-  args->socksPort = 1080;
+  args->pop3Addr = "htonl(INADDR_ANY)";
+  args->pop3Port = 2252;
 
-  args->mngAddr = "127.0.0.1";
-  args->mngPort = 8080;
+  args->push3Addr = "htonl(INADDR_ANY)";
+  args->push3Port = 2254;
 
   args->doh.host = "localhost";
   args->doh.ip = "127.0.0.1";
@@ -108,16 +109,16 @@ void parseArgs(const int argc, char** argv, pop3args* args) {
       usage(argv[0]);
       break;
     case 'l':
-      args->socksAddr = optarg;
+      args->pop3Addr = optarg;
       break;
     case 'L':
-      args->mngAddr = optarg;
+      args->push3Addr = optarg;
       break;
     case 'p':
-      args->socksPort = port(optarg);
+      args->pop3Port = port(optarg);
       break;
     case 'P':
-      args->mngPort = port(optarg);
+      args->push3Port = port(optarg);
       break;
     case 'u':
       if (nusers >= MAX_USERS) {
