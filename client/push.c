@@ -56,7 +56,7 @@ static unsigned push_read(struct selector_key* key) {
 
 void push_greeting(const unsigned state, struct selector_key* key) {
   size_t lenght;
-  char greeting[] = "+OK Pushpush3\r\n";
+  char greeting[] = "->SUCCESS: Welcome to Push3\r\n";
   uint8_t* buf = buffer_write_ptr(ATTACHMENT(key)->writeBuff, &lenght);
   memcpy(buf, greeting, strlen(greeting) + 1);
   buffer_write_adv(ATTACHMENT(key)->writeBuff, lenght);
@@ -70,11 +70,6 @@ static const struct state_definition push3_states_handlers[] = {
   },
   {
     .state = AUTHORIZATION,
-    .on_read_ready = push_read,
-    .on_write_ready = push_write,
-  },
-  {
-    .state = AUTHORIZATION_PASS,
     .on_read_ready = push_read,
     .on_write_ready = push_write,
   },

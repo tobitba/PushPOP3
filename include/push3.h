@@ -12,7 +12,6 @@
 typedef enum push3_state {
     GREETING,
     AUTHORIZATION,
-    AUTHORIZATION_PASS,
     ERROR,
     FINISH,
 } push3_state;
