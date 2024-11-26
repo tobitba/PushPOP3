@@ -95,7 +95,7 @@ push3_state finishHandler(push3* data, arg_type arg1, arg_type arg2) {
 
 static const PushCommandCDT commands[COMMAND_COUNT] = {
   {.state = PUSH_AUTHORIZATION, .command_name = "LOGIN", .execute = loginHandler, .argCount = 2},
-  {.state = PUSH_TRANSACTION, .command_name = "GET_METRICS", .execute = getMetricsHandler, .argCount = 0},
+  {.state = PUSH_TRANSACTION, .command_name = "METRICS", .execute = getMetricsHandler, .argCount = 0},
   {.state = PUSH_ANYWHERE, .command_name = "FINISH", .execute = finishHandler, .argCount = 0}
 };
 
