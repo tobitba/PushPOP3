@@ -88,7 +88,7 @@ push3_state getMetricsHandler(push3* data, arg_type arg1, arg_type arg2) {
     return PUSH_TRANSACTION;
 }
 
-push3_state getFinishHandler(push3* data, arg_type arg1, arg_type arg2) {
+push3_state finishHandler(push3* data, arg_type arg1, arg_type arg2) {
     writeOnUserBuffer2(data->writeBuff, "->SUCCESS: Closing connection...\r\n");
     return PUSH_DONE;
 }
@@ -96,7 +96,7 @@ push3_state getFinishHandler(push3* data, arg_type arg1, arg_type arg2) {
 static const PushCommandCDT commands[COMMAND_COUNT] = {
   {.state = PUSH_AUTHORIZATION, .command_name = "LOGIN", .execute = loginHandler, .argCount = 2},
   {.state = PUSH_TRANSACTION, .command_name = "GET_METRICS", .execute = getMetricsHandler, .argCount = 0},
-  {.state = PUSH_ANYWHERE, .command_name = "FINISH", .execute = getFinishHandler, .argCount = 0}
+  {.state = PUSH_ANYWHERE, .command_name = "FINISH", .execute = finishHandler, .argCount = 0}
 };
 
 static PushCommand findPushCommand(const char* name) {
@@ -176,13 +176,10 @@ PushCommand getPushCommand(buffer* b, push3_state current) {
 }
 
 push3_state runPushCommand(PushCommand command, push3* data) {
-  printf("llegué acá\n");
   if (!pushCommandContextValidation(command, data)) {
     return data->stm.current->state;
   }
-  printf("llegué acá x2\n");
 
-  printf("Running command: %s\n", command->command_name);
   push3_state newState = command->execute(data, command->arg1, command->arg2);
   free(command);
   return newState;

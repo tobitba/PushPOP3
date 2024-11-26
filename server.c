@@ -35,7 +35,6 @@ static bool done = false;
 pop3args args;
 
 static void sigtermHandler(const int signal) {
-  printf("signal %d, cleaning up and exiting\n", signal);
   done = true;
 }
 

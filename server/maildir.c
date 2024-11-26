@@ -55,7 +55,6 @@ bool maildirMarkAsSeen(MailArray* mails, size_t mailNumber) {
   mail->state = SEEN;
   char* newPath = malloc(PATH_MAX + 1);
   snprintf(newPath, PATH_MAX, "%s/%s", mails->pathSeen, mail->filename);
-  printf("%s - filename: %s,  path: %s\n", __func__, mail->filename, mail->path);
   if (rename(mail->path, newPath) < 0) {
     perror("Error moving file");
     return false;

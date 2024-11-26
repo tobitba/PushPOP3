@@ -155,9 +155,6 @@ void parseArgs(const int argc, char** argv, pop3args* args) {
       exit(1);
     }
   }
-  for (int i = 0; i < nusers; ++i) {
-    printf("user: %s, pass: %s\n", args->users[i].name, args->users[i].pass);
-  }
   if (args->maildirPath == NULL) {
     fprintf(stderr, "Missing required flag `-d <maildir path>`\n");
     exit(EXIT_FAILURE);

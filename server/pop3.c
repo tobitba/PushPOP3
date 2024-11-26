@@ -19,7 +19,6 @@ static void pop3_done(struct selector_key* key);
 static void pop3_close(struct selector_key* key);
 
 static state pop_write(struct selector_key* key) {
-  printf("%s\n", __func__);
   pop3* data = key->data;
   size_t count;
   uint8_t* ptr = buffer_read_ptr(data->writeBuff, &count);
@@ -29,15 +28,12 @@ static state pop_write(struct selector_key* key) {
     int fd = key->fd;
     selector_unregister_fd(key->s, fd);
     close(fd);
-    printf("no pude mandar datos :(");
-    // Esto no lo volvería a GREETING?
-    return 0;
+    return FINISH;
   } else {
     buffer_reset(data->writeBuff);
     selector_set_interest_key(key, OP_READ);
   }
   state currentState = data->stm.current->state;
-  printf("%s - current state: %d\n", __func__, currentState);
   if (currentState == GREETING) {
     return AUTHORIZATION;
   }
@@ -52,14 +48,12 @@ static state pop_read(struct selector_key* key) {
   size_t count;
   uint8_t* ptr = buffer_write_ptr(data->readBuff, &count);
   ssize_t n = recv(key->fd, ptr, count, 0);
-  printf("read\n");
   if (n <= 0) {
     return ERROR;
   }
   buffer_write_adv(data->readBuff, n);
   Command command = getCommand(data->readBuff, data->stm.current->state);
   state newState = runCommand(command, data);
-  printf("nuevo estado: %d\n", newState);
   selector_set_interest_key(key, OP_WRITE);
   return newState;
 }
@@ -73,7 +67,6 @@ void pop_greeting(const unsigned state, struct selector_key* key) {
 }
 
 static state pending_write(struct selector_key* key) {
-  printf("%s\n", __func__);
   pop3* data = key->data;
   size_t count;
   uint8_t* ptr = buffer_read_ptr(data->writeBuff, &count);
@@ -83,7 +76,6 @@ static state pending_write(struct selector_key* key) {
     int fd = key->fd;
     selector_unregister_fd(key->s, fd);
     close(fd);
-    printf("no pude mandar datos :(");
     return 0;
   } else {
     buffer_reset(data->writeBuff);
@@ -154,7 +146,6 @@ static void pop3_read(struct selector_key* key) {
 }
 
 static void pop3_write(struct selector_key* key) {
-  printf("write handleeer\n");
   struct state_machine* stm = &ATTACHMENT(key)->stm;
   const enum pop3_states st = stm_handler_write(stm, key);
 
@@ -193,7 +184,6 @@ static const struct fd_handler pop3_handler = {
 };
 
 void pop3_passive_accept(struct selector_key* key) {
-  printf("pasive handler\n");
   pop3* data = NULL;
   const int client = accept(key->fd, NULL, NULL); // TODO: revisar argumentos
   if (client == -1 || selector_fd_set_nio(client) == -1) goto fail;
@@ -209,11 +199,9 @@ void pop3_passive_accept(struct selector_key* key) {
   stm_init(&data->stm);
   data->mails = NULL;
 
-  printf("agrego a selector\n");
   if (SELECTOR_SUCCESS != selector_register(key->s, client, &pop3_handler, OP_WRITE, data)) {
     goto fail;
   }
-  printf("agregado a selector\n");
   incrementCurrentConnections();
   incrementTotalConnections();
   return;
