@@ -119,7 +119,7 @@ static const CommandCDT commands[] = {
 };
 
 static Command findCommand(const char* name) {
-  for (int i = 0; i < COMMAND_COUNT; i++) {
+  for (size_t i = 0; i < COMMAND_COUNT; i++) {
     if (strncasecmp(name, commands[i].command_name, MAX_COMMAND_LENGHT) == 0) {
       Command command = malloc(sizeof(CommandCDT));
       if (command == NULL) return NULL;
@@ -189,28 +189,25 @@ state runCommand(Command command, pop3* data) {
 }
 
 static bool readCommandArg(Command command, char* arg, bool* isArgPresent, buffer* b) {
-  if (buffer_can_read(b) && buffer_peak(b) == CARRIAGE_RETURN_CHAR) // the argument might be optional, this will leave isArgPresent in false
-    return true;
+  // The argument might be optional, this will leave isArgPresent in false.
+  if (buffer_can_read(b) && buffer_peak(b) == CARRIAGE_RETURN_CHAR) return true;
 
-  if (!buffer_can_read(b) || buffer_read(b) != SPACE_CHAR)
-    return false;
-
+  if (!buffer_can_read(b) || buffer_read(b) != SPACE_CHAR) return false;
 
   int j = 0;
   for (; j < MAX_ARG_LENGHT; j++) {
-    if (!buffer_can_read(b))
-      return false;
+    if (!buffer_can_read(b)) return false;
 
     char c = (char)buffer_peak(b);
     if (c == SPACE_CHAR || c == CARRIAGE_RETURN_CHAR) {
-      if (j == 0)  // The argument after the first space was another space or enter. Ex: USER__ Or User_\r\n
-        return false;
-      break; // If j != 0, there's a word between the first space and this char, it could be followed by another
-             // argument or end there if '\r'
+      // The argument after the first space was another space or enter. Ex: USER__ Or User_\r\n.
+      if (j == 0) return false;
+      // If j != 0, there's a word between the first space and this char, it could be followed by another
+      // argument or end there if '\r'.
+      break;
     }
     c = (char)buffer_read(b);
-    if (!IS_PRINTABLE_ASCII(c))
-      return false;
+    if (!IS_PRINTABLE_ASCII(c)) return false;
 
     arg[j] = c;
   }
