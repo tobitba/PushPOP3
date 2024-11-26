@@ -54,7 +54,8 @@ void _maildirAddMail(MailArray* mails, char* path, MailState state, size_t nbyte
   mail.state = state;
   mail.nbytes = nbytes;
   if (mails->length == mails->capacity) {
-    Mail* aux = realloc(mails->array, mails->capacity + CAPACITY_INCREMENT);
+    mails->capacity += CAPACITY_INCREMENT;
+    Mail* aux = realloc(mails->array, mails->capacity * sizeof(Mail));
     if (aux == NULL) {
       // TODO: do we need to handle this better?
       exit(EXIT_FAILURE);
