@@ -119,6 +119,8 @@ static void push3_close(struct selector_key* key) {
   push3* toFree = ATTACHMENT(key);
   free(toFree->writeBuff);
   free(toFree->readBuff);
+  free(toFree->user.name);
+  free(toFree->user.pass);
   free(toFree);
 
   // socks5_destroy(ATTACHMENT(key)); TODO

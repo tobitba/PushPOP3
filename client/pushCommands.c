@@ -1,6 +1,7 @@
 #include "../include/pushCommands.h"
 #include "../include/buffer.h"
 #include "../include/push3.h"
+#include "../include/authenticator.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -9,6 +10,7 @@
 #include <strings.h>
 
 #define OK "+OK\r\n"
+#define MAX_RESPONSE_LENGHT 2096
 #define MAX_COMMAND_LENGHT 20
 #define MAX_ARG_LENGHT 40
 #define COMMAND_COUNT 1
@@ -43,48 +45,39 @@ typedef struct PushCommandCDT {
 static bool readPushCommandArg(PushCommand command, arg_type* arg, buffer* b);
 static bool pushCommandContextValidation(PushCommand command, push3* data);
 
-void writeOnUserBuffer(buffer* b, char* str) {
+void writeOnUserBuffer2(buffer* b, char* str) {
   size_t lenght;
   uint8_t* buf = buffer_write_ptr(b, &lenght);
   memcpy(buf, str, strlen(str) + 1);
   buffer_write_adv(b, lenght);
 }
-//
-//state userHandler(pop3* data, char* arg1, bool isArg1Present) {
-//  puts("User handler");
-//  if (!isArg1Present) {
-//    writeOnUserBuffer(data->writeBuff, "-ERR Missing username\r\n");
-//    return AUTHORIZATION;
-//  }
-//  if (data->user.name == NULL) {
-//    data->user.name = calloc(1, MAX_ARG_LENGHT);
-//  }
-//  strcpy(data->user.name, arg1);
-//  writeOnUserBuffer(data->writeBuff, OK);
-//  return AUTHORIZATION_PASS;
-//}
-//
-//state passHandler(pop3* data, char* arg1, bool isArg1Present) {
-//  puts("Pass handler");
-//  if (!isArg1Present) {
-//    writeOnUserBuffer(data->writeBuff, "-ERR Missing password\r\n");
-//    return AUTHORIZATION_PASS;
-//  }
-//  if (isUserAndPassValid(data->user.name, arg1)) {
-//    if (data->user.pass == NULL) {
-//      data->user.pass = calloc(1, MAX_ARG_LENGHT);
-//    }
-//    strcpy(data->user.pass, arg1);
-//    // TODO: armar estructura de mails del user y verificar dirs...
-//    writeOnUserBuffer(data->writeBuff, "+OK maildrop locked and ready\r\n");
-//    return TRANSACTION; // User logged succesfully
-//  }
-//  printf("ret errorr :(  la pass recibida es: %s\n", arg1);
-//  writeOnUserBuffer(data->writeBuff, "-ERR Invalid user & pass combination, try again\r\n");
-//  return AUTHORIZATION;
-//}
 
-push3_state loginHandler(push3* datos, arg_type arg1, arg_type arg2) {
+push3_state loginHandler(push3* data, arg_type arg1, arg_type arg2) {
+    if (!arg1.isArgPresent) {
+      writeOnUserBuffer2(data->writeBuff, "->FAIL: Missing username\r\n");
+      return AUTHORIZATION;
+    }
+    if (!arg2.isArgPresent) {
+      writeOnUserBuffer2(data->writeBuff, "->FAIL: Missing password\r\n");
+      return AUTHORIZATION;
+    }
+
+    if (!isUserAndPassValid(arg1.value, arg2.value)) {
+      writeOnUserBuffer2(data->writeBuff, "->FAIL: Invalid username or password\r\n");
+      return AUTHORIZATION;
+    }
+
+    if (data->user.name == NULL) {
+      data->user.name = calloc(1, MAX_ARG_LENGHT);
+    }
+    strcpy(data->user.name, arg1.value);
+
+    if (data->user.pass == NULL) {
+          data->user.pass = calloc(1, MAX_ARG_LENGHT);
+    }
+    strcpy(data->user.pass, arg1.value);
+
+    writeOnUserBuffer2(data->writeBuff, "->SUCCESS: Logged in to the server\r\n");
     return AUTHORIZATION;
 }
 
@@ -211,17 +204,17 @@ static bool readPushCommandArg(PushCommand command, arg_type* arg, buffer* b) {
 static bool pushCommandContextValidation(PushCommand command, push3* data) {
   push3_state currentState = data->stm.current->state;
   if (command == NULL) {
-    writeOnUserBuffer(data->writeBuff, "->FAIL: Invalid command\r\n");
+    writeOnUserBuffer2(data->writeBuff, "->FAIL: Invalid command\r\n");
     return false;
   }
 
   if (currentState == AUTHORIZATION && command->state != AUTHORIZATION) {
-    writeOnUserBuffer(data->writeBuff, "->FAIL: You must be logged in to run this command. Use LOGIN <user> <pass>\r\n");
+    writeOnUserBuffer2(data->writeBuff, "->FAIL: You must be logged in to run this command. Use LOGIN <user> <pass>\r\n");
     return false;
   }
 
   if (currentState != command->state) {
-    writeOnUserBuffer(data->writeBuff, "->FAIL: You don´t have access to this command\r\n");
+    writeOnUserBuffer2(data->writeBuff, "->FAIL: You don´t have access to this command\r\n");
     return false;
   }
 

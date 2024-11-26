@@ -20,7 +20,7 @@ typedef struct push3 {
     struct state_machine stm;
     uint8_t writeData[BUFFER_SIZE], readData[BUFFER_SIZE];
     buffer *writeBuff, *readBuff;
-//    User user;
+    User user;
 } push3;
 
 void push3_passive_accept(struct selector_key* key);
