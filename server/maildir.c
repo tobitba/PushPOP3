@@ -16,7 +16,7 @@
 void _addMails(const char* path, MailArray* mailArray, MailState state);
 void _maildirAddMail(MailArray* mails, char* path, MailState state, size_t nbytes);
 
-MailArray* maildirInit(char* username, char* maildir) {
+MailArray* maildirInit(char* username, const char* maildir) {
   MailArray* mails = malloc(sizeof(MailArray));
   mails->array = malloc(sizeof(Mail) * INITIAL_CAPACITY);
   mails->capacity = INITIAL_CAPACITY;
@@ -42,8 +42,10 @@ void maildirFree(MailArray* mails) {
   free(mails);
 }
 
-int maildirGetTotalSize() {
-  return 2;
+size_t maildirGetTotalSize(MailArray* mails) {
+  size_t size = 0;
+  for (size_t i = 0; i < mails->length; ++i) size += mails->array[i].nbytes;
+  return size;
 }
 
 void _maildirAddMail(MailArray* mails, char* path, MailState state, size_t nbytes) {

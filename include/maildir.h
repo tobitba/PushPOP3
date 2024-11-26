@@ -17,8 +17,8 @@ typedef struct {
   size_t length;
 } MailArray;
 
-MailArray* maildirInit(char* username, char* maildir);
+MailArray* maildirInit(char* username, const char* maildir);
 void maildirFree(MailArray* mails);
-int maildirGetTotalSize();
+size_t maildirGetTotalSize(MailArray* mails);
 
 #endif

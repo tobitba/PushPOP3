@@ -1,8 +1,12 @@
 #include "../include/commands.h"
+#include "../include/args.h"
 #include "../include/authenticator.h"
 #include "../include/buffer.h"
+#include "../include/maildir.h"
 #include "../include/pop3.h"
 
+#include <stdarg.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,9 +14,10 @@
 #include <strings.h>
 
 #define OK "+OK\r\n"
+#define COMMAND_COUNT (sizeof(commands) / sizeof(commands[0]))
+#define MAX_RESPONSE_LENGTH 512
 #define MAX_COMMAND_LENGHT 4
 #define MAX_ARG_LENGHT 40
-#define COMMAND_COUNT 4
 #define SPACE_CHAR 32
 #define ENTER_CHAR '\n'
 #define CARRIAGE_RETURN_CHAR '\r'
@@ -40,16 +45,29 @@ typedef struct CommandCDT {
 static bool readCommandArg(Command command, char* arg, bool* isArgPresent, buffer* b);
 static bool commandContextValidation(Command command, pop3* data);
 
-void writeOnUserBuffer(buffer* b, char* str) {
-  size_t lenght;
-  uint8_t* buf = buffer_write_ptr(b, &lenght);
-  memcpy(buf, str, strlen(str) + 1);
-  buffer_write_adv(b, lenght);
+void writeOnUserBuffer(pop3* data, const char* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+
+  char response[MAX_RESPONSE_LENGTH + 1];
+  int length = vsnprintf(response, MAX_RESPONSE_LENGTH + 1, fmt, args);
+  va_end(args);
+  if (length < 0) {
+    fprintf(stderr, "vsnprintf failed\n");
+    exit(EXIT_FAILURE);
+  } else if (length > MAX_RESPONSE_LENGTH) {
+    printf("Response truncated\n");
+    length = MAX_RESPONSE_LENGTH;
+  }
+  size_t availableWriteLength;
+  uint8_t* buf = buffer_write_ptr(data->writeBuff, &availableWriteLength);
+  memcpy(buf, response, length);
+  buffer_write_adv(data->writeBuff, length);
 }
 
-state noopHandler(pop3* data, char* arg1, bool isArgPresent) {
+state noopHandler(pop3* data, char* arg1, bool _) {
   puts("Noop handler");
-  writeOnUserBuffer(data->writeBuff, OK);
+  writeOnUserBuffer(data, OK);
   return TRANSACTION;
 }
 
@@ -63,7 +81,7 @@ state userHandler(pop3* data, char* arg1, bool isArg1Present) {
     data->user.name = calloc(1, MAX_ARG_LENGHT);
   }
   strcpy(data->user.name, arg1);
-  writeOnUserBuffer(data->writeBuff, OK);
+  writeOnUserBuffer(data, OK);
   return AUTHORIZATION_PASS;
 }
 
@@ -78,8 +96,8 @@ state passHandler(pop3* data, char* arg1, bool isArg1Present) {
       data->user.pass = calloc(1, MAX_ARG_LENGHT);
     }
     strcpy(data->user.pass, arg1);
-    // TODO: armar estructura de mails del user y verificar dirs...
-    writeOnUserBuffer(data->writeBuff, "+OK maildrop locked and ready\r\n");
+    data->mails = maildirInit(data->user.name, args.maildirPath);
+    writeOnUserBuffer(data, "+OK maildrop locked and ready\r\n");
     return TRANSACTION; // User logged succesfully
   }
   printf("ret errorr :(  la pass recibida es: %s\n", arg1);
@@ -87,17 +105,16 @@ state passHandler(pop3* data, char* arg1, bool isArg1Present) {
   return AUTHORIZATION;
 }
 
-state stat_handler(pop3* data, char* arg1, bool isArg1Present) {
-  // manejar stat
-  // +OK <num_msg> <size_mailbox_in_octet>
-  printf("stat handler\n");
+state statHandler(pop3* data, char* arg1, bool _) {
+  puts("Stat handler");
+  writeOnUserBuffer(data, "+OK %lu %lu\r\n", data->mails->length, maildirGetTotalSize(data->mails));
   return TRANSACTION;
 }
 
 static const CommandCDT commands[COMMAND_COUNT] = {
   {.state = AUTHORIZATION, .command_name = "USER", .execute = userHandler, .argCount = 1},
   {.state = AUTHORIZATION_PASS, .command_name = "PASS", .execute = passHandler, .argCount = 1},
-  {.state = TRANSACTION, .command_name = "STAT", .execute = stat_handler, .argCount = 0},
+  {.state = TRANSACTION, .command_name = "STAT", .execute = statHandler, .argCount = 0},
   {.state = TRANSACTION, .command_name = "NOOP", .execute = noopHandler, .argCount = 0},
 };
 
