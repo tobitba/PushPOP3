@@ -158,8 +158,10 @@ Command getCommand(buffer* b, const state current) {
 }
 
 state runCommand(Command command, pop3* data) {
-  if (!commandContextValidation(command, data))
+  if (!commandContextValidation(command, data)) {
+    free(command);
     return data->stm.current->state;
+  }
 
   printf("Running command: %s\n", command->command_name);
   state newState = command->execute(data, command->arg1, command->isArg1Present);
