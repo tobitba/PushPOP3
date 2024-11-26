@@ -1,400 +1,225 @@
-#include "../include/commands.h"
-#include "../include/args.h"
-#include "../include/authenticator.h"
-#include "../include/buffer.h"
-#include "../include/maildir.h"
 #include "../include/pop3.h"
-
-#include <stdarg.h>
-#include <stddef.h>
+#include "../include/buffer.h"
+#include "../include/commands.h"
+#include "../include/maildir.h"
+#include "../include/selector.h"
+#include "../include/stm.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
-#define OK "+OK\r\n"
-#define COMMAND_COUNT (sizeof(commands) / sizeof(commands[0]))
-#define MAX_RESPONSE_LENGTH 512
-#define MAX_COMMAND_LENGHT 4
-#define MAX_ARG_LENGHT 40
-#define SPACE_CHAR 32
-#define ENTER_CHAR '\n'
-#define CARRIAGE_RETURN_CHAR '\r'
+#include "../include/serverMetrics.h"
 
-#define IS_UPPER_CASE_LETTER(n) ((n) >= 'A' && (n) <= 'Z')
-#define IS_LOWER_CASE_LETTER(n) ((n) >= 'a' && (n) <= 'z')
-#define IS_ALPHABET(n) (IS_LOWER_CASE_LETTER(n) || IS_UPPER_CASE_LETTER(n))
+#define ATTACHMENT(key) ((pop3*)(key)->data)
 
-// from "!"(33) to "~"(126)
-#define IS_PRINTABLE_ASCII(n) ((n) >= '!' && (n) <= '~')
+static void pop3_done(struct selector_key* key);
+static void pop3_close(struct selector_key* key);
 
-extern pop3args args;
+static state pop_write(struct selector_key* key) {
+  printf("%s\n", __func__);
+  pop3* data = key->data;
+  size_t count;
+  uint8_t* ptr = buffer_read_ptr(data->writeBuff, &count);
 
-typedef state (*handler)(pop3* data, char* arg, bool isArgPresent);
-state userHandler(pop3* data, char* arg, bool argPresent);
-state passHandler(pop3* data, char* arg, bool argPresent);
-state statHandler(pop3* data, char* _arg, bool _argPresent);
-state noopHandler(pop3* data, char* _arg, bool _argPresent);
-state listHandler(pop3* data, char* arg, bool argPresent);
-state retrHandler(pop3* data, char* arg, bool argPresent);
-state deleHandler(pop3* data, char* arg, bool argPresent);
-state rsetHandler(pop3* data, char* _arg, bool _argPresent);
-state quitHandler(pop3* data, char* _arg, bool _argPresent);
-
-typedef struct CommandCDT {
-  state state;
-  char command_name[MAX_COMMAND_LENGHT + 1];
-  handler execute;
-  int argCount;
-  char arg[MAX_ARG_LENGHT + 1];
-  bool isArgPresent;
-} CommandCDT;
-
-typedef enum { USER, PASS, STAT, NOOP, LIST, RETR, DELE, RSET, QUIT } CommandNames;
-
-static CommandCDT commands[] = {
-  [USER] = {.state = AUTHORIZATION, .command_name = "USER", .execute = userHandler, .argCount = 1},
-  [PASS] = {.state = AUTHORIZATION_PASS, .command_name = "PASS", .execute = passHandler, .argCount = 1},
-  [STAT] = {.state = TRANSACTION, .command_name = "STAT", .execute = statHandler, .argCount = 0},
-  [NOOP] = {.state = TRANSACTION, .command_name = "NOOP", .execute = noopHandler, .argCount = 0},
-  [LIST] = {.state = TRANSACTION, .command_name = "LIST", .execute = listHandler, .argCount = 1},
-  [RETR] = {.state = TRANSACTION, .command_name = "RETR", .execute = retrHandler, .argCount = 1},
-  [DELE] = {.state = TRANSACTION, .command_name = "DELE", .execute = deleHandler, .argCount = 1},
-  [RSET] = {.state = TRANSACTION, .command_name = "RSET", .execute = rsetHandler, .argCount = 0},
-  [QUIT] = {.state = ANYWHERE, .command_name = "QUIT", .execute = quitHandler, .argCount = 0},
-};
-
-static bool readCommandArg(Command command, char* arg, bool* isArgPresent, buffer* b);
-static bool commandContextValidation(Command command, pop3* data);
-
-bool writeResponse(pop3* data, const char* fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-
-  char response[MAX_RESPONSE_LENGTH + 1];
-  int length = vsnprintf(response, MAX_RESPONSE_LENGTH + 1, fmt, args);
-  va_end(args);
-  if (length < 0) {
-    fprintf(stderr, "vsnprintf failed\n");
-    exit(EXIT_FAILURE);
-  } else if (length > MAX_RESPONSE_LENGTH) {
-    printf("Response truncated\n");
-    length = MAX_RESPONSE_LENGTH;
-  }
-  size_t availableWriteLength;
-  uint8_t* buf = buffer_write_ptr(data->writeBuff, &availableWriteLength);
-  if (availableWriteLength < (size_t)length) return false;
-  memcpy(buf, response, length);
-  buffer_write_adv(data->writeBuff, length);
-  return true;
-}
-
-state noopHandler(pop3* data, char* _arg, bool _argPresent) {
-  puts("Noop handler");
-  writeResponse(data, OK);
-  return TRANSACTION;
-}
-
-state userHandler(pop3* data, char* arg, bool argPresent) {
-  puts("User handler");
-  if (!argPresent) {
-    writeResponse(data, "-ERR Missing username\r\n");
-    return AUTHORIZATION;
-  }
-  if (data->user.name == NULL) {
-    data->user.name = calloc(1, MAX_ARG_LENGHT);
-  }
-  strcpy(data->user.name, arg);
-  writeResponse(data, OK);
-  return AUTHORIZATION_PASS;
-}
-
-state passHandler(pop3* data, char* arg, bool argPresent) {
-  puts("Pass handler");
-  if (!argPresent) {
-    writeResponse(data, "-ERR Missing password\r\n");
-    return AUTHORIZATION_PASS;
-  }
-  if (isUserAndPassValid(data->user.name, arg)) {
-    if (data->user.pass == NULL) {
-      data->user.pass = calloc(1, MAX_ARG_LENGHT);
-    }
-    strcpy(data->user.pass, arg);
-    data->mails = maildirInit(data->user.name, args.maildirPath);
-    writeResponse(data, "+OK maildrop locked and ready\r\n");
-    return TRANSACTION; // User logged succesfully
-  }
-  printf("ret errorr :(  la pass recibida es: %s\n", arg);
-  writeResponse(data, "-ERR Invalid user & pass combination, try again\r\n");
-  return AUTHORIZATION;
-}
-
-state statHandler(pop3* data, char* arg, bool _) {
-  puts("Stat handler");
-  writeResponse(data, "+OK %lu %lu\r\n", data->mails->length, maildirGetTotalSize(data->mails));
-  return TRANSACTION;
-}
-
-size_t listMailsTillBufferFull(pop3* data, size_t startIdx) {
-  size_t mailCount = data->mails->length;
-  size_t i;
-  for (i = startIdx; i < mailCount; ++i) {
-    Mail mail = data->mails->array[i];
-    if (!mail.markedDeleted) {
-      if (!writeResponse(data, "%lu %lu\r\n", mail.number, mail.nbytes)) {
-        break;
-      }
-    }
-  }
-  return i;
-}
-
-state listHandler(pop3* data, char* arg, bool argPresent) {
-  if (data->stm.current->state == PENDING_RESPONSE) {
-    size_t* listedLast = data->pendingData;
-    *listedLast = listMailsTillBufferFull(data, *listedLast);
-    if (*listedLast < data->mails->length) return PENDING_RESPONSE;
-    data->pendingCommand = NULL;
-    free(data->pendingData);
+  const ssize_t n = send(key->fd, ptr, count, MSG_NOSIGNAL);
+  if (n < 0) {
+    int fd = key->fd;
+    selector_unregister_fd(key->s, fd);
+    close(fd);
+    printf("no pude mandar datos :(");
+    // Esto no lo volvería a GREETING?
+    return 0;
   } else {
-    puts("LIST handler");
-    if (argPresent) {
-      size_t mailNumber = atoi(arg);
-      if (mailNumber == 0 || mailNumber > data->mails->length) {
-        writeResponse(data, "-ERR no such message\r\n");
-        return TRANSACTION;
-      }
-      Mail mail = data->mails->array[mailNumber - 1];
-      if (mail.markedDeleted) {
-        writeResponse(data, "-ERR the mail was marked to be deleted\r\n");
-        return TRANSACTION;
-      }
-      writeResponse(data, "+OK %i %lu\r\n", mailNumber, data->mails->array[mailNumber - 1].nbytes);
-    } else {
-      size_t mailCount = data->mails->length;
-      writeResponse(
-        data, "+OK %lu messages (%lu octects)\r\n", maildirNonDeletedCount(data->mails),
-        maildirGetTotalSize(data->mails)
-      );
-      size_t listedCount = listMailsTillBufferFull(data, 0);
-      if (listedCount < mailCount) {
-        data->pendingCommand = &commands[LIST];
-        data->pendingData = malloc(sizeof(size_t));
-        *(size_t*)data->pendingData = listedCount;
-        return PENDING_RESPONSE;
-      }
-    }
-  }
-  if (!writeResponse(data, ".\r\n")) return PENDING_RESPONSE;
-  return TRANSACTION;
-}
-
-state retrHandler(pop3* data, char* arg, bool argPresent) {
-  FILE* file;
-  if (data->stm.current->state == PENDING_RESPONSE) {
-    file = data->pendingData;
-  } else {
-    if (!argPresent) {
-      writeResponse(data, "-ERR missing argument\r\n");
-      return TRANSACTION;
-    }
-    size_t mailNumber = atoi(arg);
-    if (mailNumber == 0 || mailNumber > data->mails->length) {
-      writeResponse(data, "-ERR no such message\r\n");
-      return TRANSACTION;
-    }
-    Mail mail = data->mails->array[mailNumber - 1];
-    if (mail.markedDeleted) {
-      writeResponse(data, "-ERR the mail was marked to be deleted\r\n");
-      return TRANSACTION;
-    }
-    file = fopen(mail.path, "r");
-    maildirMarkAsSeen(data->mails, mailNumber);
-    writeResponse(data, "+OK %lu octects\r\n", mail.nbytes);
-  }
-  size_t availableWriteLength;
-  uint8_t* buf = buffer_write_ptr(data->writeBuff, &availableWriteLength);
-  size_t length = fread(buf, 1, availableWriteLength, file);
-  buffer_write_adv(data->writeBuff, length);
-  if (feof(file)) {
-    if (!writeResponse(data, ".\r\n")) return PENDING_RESPONSE;
-    fclose(file);
-    return TRANSACTION;
-  } else {
-    data->pendingCommand = &commands[RETR];
-    data->pendingData = file;
-    return PENDING_RESPONSE;
-  }
-}
-
-state deleHandler(pop3* data, char* arg, bool argPresent) {
-  if (!argPresent) {
-    writeResponse(data, "-ERR missing argument\r\n");
-    return TRANSACTION;
-  }
-  size_t mailNumber = atoi(arg);
-  if (mailNumber == 0 || mailNumber > data->mails->length) {
-    writeResponse(data, "-ERR no such message\r\n");
-    return TRANSACTION;
-  }
-  Mail* mail = data->mails->array + mailNumber - 1;
-  if (mail->markedDeleted) {
-    writeResponse(data, "-ERR message %lu has already been marked to be deleted\r\n", mailNumber);
-    return TRANSACTION;
-  }
-  mail->markedDeleted = true;
-  writeResponse(data, "+OK message %lu marked to be deleted\r\n", mailNumber);
-  return TRANSACTION;
-}
-
-state rsetHandler(pop3* data, char* _arg, bool _argPresent) {
-  for (size_t i = 0; i < data->mails->length; ++i) {
-    data->mails->array[i].markedDeleted = false;
-  }
-  writeResponse(data, OK);
-  return TRANSACTION;
-}
-
-state quitHandler(pop3* data, char* _arg, bool _argPresent) {
-  if (data->stm.current->state == TRANSACTION) {
-    if (maildirDeleteMarked(data->mails) < 0) {
-      writeResponse(data, "-ERR some deleted messages not removed\r\n");
-    } else {
-      writeResponse(data, "+OK\r\n");
-    }
-  }
-  // TODO: handle propper logout
-  return UPDATE;
-}
-
-static Command findCommand(const char* name) {
-  for (size_t i = 0; i < COMMAND_COUNT; i++) {
-    if (strncasecmp(name, commands[i].command_name, MAX_COMMAND_LENGHT) == 0) {
-      commands[i].isArgPresent = false;
-      return commands + i;
-    }
-  }
-  return NULL;
-}
-
-Command getCommand(buffer* b, const state current) {
-  // los comandos en pop3 son de 4 caracteres (case insensitive)
-  char commandName[MAX_COMMAND_LENGHT + 1] = {0};
-  for (int i = 0; i < MAX_COMMAND_LENGHT && buffer_can_read(b); i++) {
-    char c = (char)buffer_read(b);
-    if (!IS_ALPHABET(c)) {
-      buffer_reset(b);
-      return NULL;
-    };
-    commandName[i] = c;
-  }
-  Command command = findCommand(commandName);
-  if (command == NULL) {
-    buffer_reset(b);
-    return NULL;
-  }
-
-  if (command->argCount > 0) {
-    if (!readCommandArg(command, command->arg, &(command->isArgPresent), b)) {
-      buffer_reset(b);
-      return NULL;
-    }
-  }
-
-  if (!buffer_can_read(b) || buffer_read(b) != CARRIAGE_RETURN_CHAR) {
-    buffer_reset(b);
-    return NULL;
-  }
-
-  if (!buffer_can_read(b) || buffer_read(b) != ENTER_CHAR) {
-    buffer_reset(b);
-    return NULL;
-  }
-
-  buffer_reset(b);
-  return command;
-}
-
-state runCommand(Command command, pop3* data) {
-  if (!commandContextValidation(command, data)) {
-    return data->stm.current->state;
-  }
-
-  printf("Running command: %s\n", command->command_name);
-  state newState = command->execute(data, command->arg, command->isArgPresent);
-  return newState;
-}
-
-state continuePendingCommand(pop3* data) {
-  Command command = data->pendingCommand;
-  printf("Continuing command: %s\n", command->command_name);
-  state newState = command->execute(data, command->arg, command->isArgPresent);
-  // if (newState != PENDING_RESPONSE) free(command);
-  return newState;
-}
-
-static bool readCommandArg(Command command, char* arg, bool* isArgPresent, buffer* b) {
-  // The argument might be optional, this will leave isArgPresent in false.
-  if (buffer_can_read(b) && buffer_peak(b) == CARRIAGE_RETURN_CHAR) return true;
-
-  if (!buffer_can_read(b) || buffer_read(b) != SPACE_CHAR) return false;
-
-  int j = 0;
-  for (; j < MAX_ARG_LENGHT; j++) {
-    if (!buffer_can_read(b)) return false;
-
-    char c = (char)buffer_peak(b);
-    if (c == SPACE_CHAR || c == CARRIAGE_RETURN_CHAR) {
-      // The argument after the first space was another space or enter. Ex: USER__ Or User_\r\n.
-      if (j == 0) return false;
-      // If j != 0, there's a word between the first space and this char, it could be followed by another
-      // argument or end there if '\r'.
-      break;
-    }
-    c = (char)buffer_read(b);
-    if (!IS_PRINTABLE_ASCII(c)) return false;
-
-    arg[j] = c;
-  }
-  arg[j] = '\0';
-  *isArgPresent = true;
-  return true;
-}
-
-static bool commandContextValidation(Command command, pop3* data) {
-  if (command == NULL) {
-    writeResponse(data, "-ERR Invalid command\r\n");
-    return false;
+    buffer_reset(data->writeBuff);
+    selector_set_interest_key(key, OP_READ);
   }
   state currentState = data->stm.current->state;
-
-  if (command->state == ANYWHERE) return true;
-
-  if (currentState == TRANSACTION && command->state != TRANSACTION) {
-    writeResponse(data, "-ERR You are already logged in\r\n");
-    return false;
+  printf("%s - current state: %d\n", __func__, currentState);
+  if (currentState == GREETING) {
+    return AUTHORIZATION;
   }
-
-  if (currentState != TRANSACTION && command->state == TRANSACTION) {
-    writeResponse(data, "-ERR You must be logged in to use this command\r\n");
-    return false;
+  if (currentState == UPDATE || currentState == ERROR) {
+    return FINISH;
   }
+  return currentState;
+}
 
-  if (currentState == AUTHORIZATION && command->state == AUTHORIZATION_PASS) {
-    writeResponse(data, "-ERR You must issue a USER command first\r\n");
-    return false;
+static state pop_read(struct selector_key* key) {
+  pop3* data = ATTACHMENT(key);
+  size_t count;
+  uint8_t* ptr = buffer_write_ptr(data->readBuff, &count);
+  ssize_t n = recv(key->fd, ptr, count, 0);
+  printf("read\n");
+  if (n <= 0) {
+    return ERROR;
   }
+  buffer_write_adv(data->readBuff, n);
+  Command command = getCommand(data->readBuff, data->stm.current->state);
+  state newState = runCommand(command, data);
+  printf("nuevo estado: %d\n", newState);
+  selector_set_interest_key(key, OP_WRITE);
+  return newState;
+}
 
-  if (currentState == AUTHORIZATION_PASS && command->state == AUTHORIZATION) {
-    writeResponse(data, "-ERR You've already picked a User, try a password\r\n");
-    return false;
+void pop_greeting(const unsigned state, struct selector_key* key) {
+  size_t lenght;
+  uint8_t* buf = buffer_write_ptr(ATTACHMENT(key)->writeBuff, &lenght);
+  char greeting[] = "+OK PushPop3\r\n";
+  memcpy(buf, greeting, sizeof(greeting) - 1);
+  buffer_write_adv(ATTACHMENT(key)->writeBuff, sizeof(greeting) - 1);
+}
+
+static state pending_write(struct selector_key* key) {
+  printf("%s\n", __func__);
+  pop3* data = key->data;
+  size_t count;
+  uint8_t* ptr = buffer_read_ptr(data->writeBuff, &count);
+
+  const ssize_t n = send(key->fd, ptr, count, MSG_NOSIGNAL);
+  if (n < 0) {
+    int fd = key->fd;
+    selector_unregister_fd(key->s, fd);
+    close(fd);
+    printf("no pude mandar datos :(");
+    return 0;
+  } else {
+    buffer_reset(data->writeBuff);
   }
+  return continuePendingCommand(data);
+}
 
-  if (currentState != command->state) {
-    writeResponse(data, "-ERR You don't have access to this command\r\n");
-    return false;
+static const struct state_definition pop3_states_handlers[] = {
+  {
+    .state = GREETING,
+    .on_arrival = pop_greeting,
+    .on_write_ready = pop_write,
+  },
+  {
+    .state = AUTHORIZATION,
+    .on_read_ready = pop_read,
+    .on_write_ready = pop_write,
+  },
+  {
+    .state = AUTHORIZATION_PASS,
+    .on_read_ready = pop_read,
+    .on_write_ready = pop_write,
+  },
+  {
+    .state = TRANSACTION,
+    .on_write_ready = pop_write,
+    .on_read_ready = pop_read,
+
+  },
+  {.state = ANYWHERE},
+  {
+    .state = UPDATE,
+    .on_write_ready = pop_write,
+  },
+  {
+    .state = PENDING_RESPONSE,
+    .on_write_ready = pending_write,
+  },
+  {.state = ERROR},
+  {
+    .state = FINISH
+  },
+};
+
+static void pop3_done(struct selector_key* key) {
+  int fd = key->fd;
+  if (fd != -1) {
+    selector_status selStatus = selector_unregister_fd(key->s, fd);
+    if (SELECTOR_SUCCESS != selStatus) {
+      abort();
+    }
+    struct linger so_linger;
+    so_linger.l_onoff = 1;
+    so_linger.l_linger = 0;
+    setsockopt(fd, SOL_SOCKET, SO_LINGER, &so_linger, sizeof(so_linger));
+
+    close(fd);
   }
+}
 
-  return true;
+static void pop3_read(struct selector_key* key) {
+  struct state_machine* stm = &ATTACHMENT(key)->stm;
+  const enum pop3_states st = stm_handler_read(stm, key);
+
+  if (ERROR == st || FINISH == st) {
+    pop3_done(key);
+  }
+}
+
+static void pop3_write(struct selector_key* key) {
+  printf("write handleeer\n");
+  struct state_machine* stm = &ATTACHMENT(key)->stm;
+  const enum pop3_states st = stm_handler_write(stm, key);
+
+  if (ERROR == st || FINISH == st) {
+    pop3_done(key);
+  }
+}
+
+static void pop3_block(struct selector_key* key) {
+  struct state_machine* stm = &ATTACHMENT(key)->stm;
+  const enum pop3_states st = stm_handler_block(stm, key);
+
+  if (ERROR == st || FINISH == st) {
+    pop3_done(key);
+  }
+}
+
+static void pop3_close(struct selector_key* key) {
+  pop3* toFree = ATTACHMENT(key);
+  free(toFree->writeBuff);
+  free(toFree->readBuff);
+  free(toFree->user.name);
+  free(toFree->user.pass);
+  if (toFree->mails != NULL) maildirFree(toFree->mails);
+  free(toFree);
+  decrementCurrentConnections();
+
+  // socks5_destroy(ATTACHMENT(key)); TODO
+}
+
+static const struct fd_handler pop3_handler = {
+  .handle_read = pop3_read,
+  .handle_write = pop3_write,
+  .handle_close = pop3_close,
+  .handle_block = pop3_block,
+};
+
+void pop3_passive_accept(struct selector_key* key) {
+  printf("pasive handler\n");
+  pop3* data = NULL;
+  const int client = accept(key->fd, NULL, NULL); // TODO: revisar argumentos
+  if (client == -1 || selector_fd_set_nio(client) == -1) goto fail;
+
+  data = calloc(1, sizeof(pop3));
+  data->readBuff = malloc(sizeof(struct buffer));
+  buffer_init(data->readBuff, BUFFER_SIZE, data->readData);
+  data->writeBuff = malloc(sizeof(struct buffer));
+  buffer_init(data->writeBuff, BUFFER_SIZE, data->writeData);
+  data->stm.initial = GREETING;
+  data->stm.max_state = FINISH;
+  data->stm.states = pop3_states_handlers;
+  stm_init(&data->stm);
+  data->mails = NULL;
+
+  printf("agrego a selector\n");
+  if (SELECTOR_SUCCESS != selector_register(key->s, client, &pop3_handler, OP_WRITE, data)) {
+    goto fail;
+  }
+  printf("agregado a selector\n");
+  incrementCurrentConnections();
+  incrementTotalConnections();
+  return;
+fail:
+  if (client != -1) {
+    close(client);
+  }
+  // socks5_destroy(state); TODO: ver los frees y demas cosas no tan lindas...
 }

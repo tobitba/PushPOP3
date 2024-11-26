@@ -11,7 +11,12 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "../include/serverMetrics.h"
+
 #define ATTACHMENT(key) ((pop3*)(key)->data)
+
+static void pop3_done(struct selector_key* key);
+static void pop3_close(struct selector_key* key);
 
 static state pop_write(struct selector_key* key) {
   printf("%s\n", __func__);
@@ -35,6 +40,9 @@ static state pop_write(struct selector_key* key) {
   printf("%s - current state: %d\n", __func__, currentState);
   if (currentState == GREETING) {
     return AUTHORIZATION;
+  }
+  if (currentState == UPDATE || currentState == ERROR) {
+    return FINISH;
   }
   return currentState;
 }
@@ -108,22 +116,30 @@ static const struct state_definition pop3_states_handlers[] = {
   {.state = ANYWHERE},
   {
     .state = UPDATE,
-    .on_write_ready = pop_write, // TODO add read handler and close session and stuff
+    .on_write_ready = pop_write,
   },
   {
     .state = PENDING_RESPONSE,
     .on_write_ready = pending_write,
   },
   {.state = ERROR},
-  {.state = FINISH},
+  {
+    .state = FINISH
+  },
 };
 
 static void pop3_done(struct selector_key* key) {
   int fd = key->fd;
   if (fd != -1) {
-    if (SELECTOR_SUCCESS != selector_unregister_fd(key->s, fd)) {
+    selector_status selStatus = selector_unregister_fd(key->s, fd);
+    if (SELECTOR_SUCCESS != selStatus) {
       abort();
     }
+    struct linger so_linger;
+    so_linger.l_onoff = 1;
+    so_linger.l_linger = 0;
+    setsockopt(fd, SOL_SOCKET, SO_LINGER, &so_linger, sizeof(so_linger));
+
     close(fd);
   }
 }
@@ -164,6 +180,7 @@ static void pop3_close(struct selector_key* key) {
   free(toFree->user.pass);
   if (toFree->mails != NULL) maildirFree(toFree->mails);
   free(toFree);
+  decrementCurrentConnections();
 
   // socks5_destroy(ATTACHMENT(key)); TODO
 }
@@ -197,6 +214,8 @@ void pop3_passive_accept(struct selector_key* key) {
     goto fail;
   }
   printf("agregado a selector\n");
+  incrementCurrentConnections();
+  incrementTotalConnections();
   return;
 fail:
   if (client != -1) {
