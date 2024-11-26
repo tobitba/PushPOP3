@@ -31,6 +31,7 @@
 #include "include/selector.h"
 
 static bool done = false;
+pop3args args;
 
 static void sigtermHandler(const int signal) {
   printf("signal %d, cleaning up and exiting\n", signal);
@@ -39,7 +40,6 @@ static void sigtermHandler(const int signal) {
 
 int main(int argc, char** argv) {
 
-  struct pop3args args;
   parseArgs(argc, argv, &args);
   initAuthenticator(args.users, args.userCount);
 

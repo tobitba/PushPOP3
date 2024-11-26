@@ -24,6 +24,8 @@
 // from "!"(33) to "~"(126)
 #define IS_PRINTABLE_ASCII(n) ((n) >= '!' && (n) <= '~')
 
+extern pop3args args;
+
 typedef state (*handler)(pop3* datos, char* arg1, bool isArg1Present);
 
 typedef struct CommandCDT {
