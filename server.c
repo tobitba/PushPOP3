@@ -55,11 +55,7 @@ int main(int argc, char** argv) {
   selector_status ss = SELECTOR_SUCCESS;
   fd_selector selector = NULL;
 
-  struct sockaddr_in addrPop; // OJO esto es solo ipv4
-  memset(&addrPop, 0, sizeof(addrPop));
-  addrPop.sin_family = AF_INET;
-  addrPop.sin_addr.s_addr = htonl(INADDR_ANY);
-  addrPop.sin_port = htons(pop3_port);
+
 
   struct sockaddr_in addrPush; // OJO esto es solo ipv4
   memset(&addrPush, 0, sizeof(addrPush));
@@ -67,12 +63,29 @@ int main(int argc, char** argv) {
   addrPush.sin_addr.s_addr = htonl(INADDR_ANY);
   addrPush.sin_port = htons(configurator_port);
 
-  const int server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-  if (server < 0) {
-    err_msg = "unable to create socket";
+
+
+  const int server6 = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
+  if (server6 < 0) {
+    err_msg = "unable to create ipv6 socket";
     goto finally;
   }
  
+  struct sockaddr_in6 addrServer6;
+    memset(&addrServer6, 0, sizeof(addrServer6));
+    addrServer6.sin6_family = AF_INET6;
+    addrServer6.sin6_addr = in6addr_any;
+    addrServer6.sin6_port = htons(pop3_port); 
+
+  if (bind(server6, (struct sockaddr*)&addrServer6, sizeof(addrServer6)) < 0) {
+    err_msg = "unable to bind socket 6";
+    goto finally;
+  }
+
+    if (listen(server6, 20) < 0) {
+    err_msg = "unable to listen 6";
+    goto finally;
+  }
 
   const int pushServer = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (pushServer < 0) {
@@ -81,23 +94,16 @@ int main(int argc, char** argv) {
   }
 
   // man 7 ip. no importa reportar nada si falla.
-  setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
+  setsockopt(server6, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
   setsockopt(pushServer, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
 
-  if (bind(server, (struct sockaddr*)&addrPop, sizeof(addrPop)) < 0) {
-    err_msg = "unable to bind socket";
-    goto finally;
-  }
 
   if (bind(pushServer, (struct sockaddr*)&addrPush, sizeof(addrPush)) < 0) {
     err_msg = "unable to bind socket";
     goto finally;
   }
 
-  if (listen(server, 20) < 0) {
-    err_msg = "unable to listen";
-    goto finally;
-  }
+
 
   if (listen(pushServer, 20) < 0) {
     err_msg = "unable to listen";
@@ -112,7 +118,7 @@ int main(int argc, char** argv) {
   signal(SIGTERM, sigtermHandler);
   signal(SIGINT, sigtermHandler);
 
-  if (selector_fd_set_nio(server) == -1) {
+  if (selector_fd_set_nio(server6) == -1) {
     err_msg = "getting server socket flags";
     goto finally;
   }
@@ -139,7 +145,7 @@ int main(int argc, char** argv) {
     .handle_write = NULL,
     .handle_close = NULL, // nada que liberar
   };
-  ss = selector_register(selector, server, &pop3_pasive_handler, OP_READ, NULL);
+  ss = selector_register(selector, server6, &pop3_pasive_handler, OP_READ, NULL);
   if (ss != SELECTOR_SUCCESS) {
     err_msg = "registering fd";
     goto finally;
@@ -187,8 +193,8 @@ finally:
 
   // socksv5_pool_destroy();
 
-  if (server >= 0) {
-    close(server);
+  if (server6 >= 0) {
+    close(server6);
   }
   return ret;
 }
