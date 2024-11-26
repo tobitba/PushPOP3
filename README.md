@@ -1,4 +1,3 @@
-## Ubicación de todo lo del informe  
 ## Generación del Ejecutable  
 Simplemente pararse en la raíz del directorio y correr el comando  
     ```make all```  
