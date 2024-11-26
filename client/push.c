@@ -34,6 +34,9 @@ static unsigned push_write(struct selector_key* key) {
   if (currentState == PUSH_GREETING) {
     return PUSH_AUTHORIZATION;
   }
+  if (currentState == PUSH_DONE || currentState == PUSH_ERROR) {
+    return PUSH_FINISH;
+  }
   return currentState;
 }
 
@@ -79,6 +82,9 @@ static const struct state_definition push3_states_handlers[] = {
   },
   {
     .state = PUSH_ANYWHERE
+  },{
+    .state = PUSH_DONE,
+    .on_write_ready = push_write
   },
   {.state = PUSH_ERROR},
   {.state = PUSH_FINISH},
@@ -90,6 +96,11 @@ static void push3_done(struct selector_key* key) {
     if (SELECTOR_SUCCESS != selector_unregister_fd(key->s, fd)) {
       abort();
     }
+    struct linger so_linger;
+    so_linger.l_onoff = 1;
+    so_linger.l_linger = 0;
+    setsockopt(fd, SOL_SOCKET, SO_LINGER, &so_linger, sizeof(so_linger));
+
     close(fd);
   }
 }
