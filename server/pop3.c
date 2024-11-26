@@ -46,16 +46,13 @@ static unsigned pop_read(struct selector_key* key) {
   printf("read\n");
   if (n <= 0) {
     return ERROR;
-  } else {
-    buffer_write_adv(datos->readBuff, n);
-    Command command = getCommand(datos->readBuff, datos->stm.current->state);
-    state newState = runCommand(command, datos);
-    printf("nuevo estado: %d\n", newState);
-    selector_set_interest_key(key, OP_WRITE);
-    return newState;
   }
-
-  return datos->stm.current->state;
+  buffer_write_adv(datos->readBuff, n);
+  Command command = getCommand(datos->readBuff, datos->stm.current->state);
+  state newState = runCommand(command, datos);
+  printf("nuevo estado: %d\n", newState);
+  selector_set_interest_key(key, OP_WRITE);
+  return newState;
 }
 
 void pop_greeting(const unsigned state, struct selector_key* key) {
