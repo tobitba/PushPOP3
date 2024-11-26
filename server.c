@@ -28,6 +28,7 @@
 #include "include/args.h"
 #include "include/authenticator.h"
 #include "include/pop3.h"
+#include "include/push3.h"
 #include "include/selector.h"
 
 static bool done = false;
@@ -44,10 +45,8 @@ int main(int argc, char** argv) {
   initAuthenticator(args.users, args.userCount);
 
   unsigned pop3_port = 2252;
-  // unsigned configurator_port = 2254;
-  // unsigned port = 2256;
+  unsigned configurator_port = 2254;
 
-  // insert args parser
 
   // no tenemos nada que leer de stdin
   close(0);
@@ -56,24 +55,41 @@ int main(int argc, char** argv) {
   selector_status ss = SELECTOR_SUCCESS;
   fd_selector selector = NULL;
 
-  struct sockaddr_in addr; // OJO esto es solo ipv4
-  memset(&addr, 0, sizeof(addr));
-  addr.sin_family = AF_INET;
-  addr.sin_addr.s_addr = htonl(INADDR_ANY);
-  addr.sin_port = htons(pop3_port);
+  struct sockaddr_in addrPop; // OJO esto es solo ipv4
+  memset(&addrPop, 0, sizeof(addrPop));
+  addrPop.sin_family = AF_INET;
+  addrPop.sin_addr.s_addr = htonl(INADDR_ANY);
+  addrPop.sin_port = htons(pop3_port);
+
+  struct sockaddr_in addrPush; // OJO esto es solo ipv4
+  memset(&addrPush, 0, sizeof(addrPush));
+  addrPush.sin_family = AF_INET;
+  addrPush.sin_addr.s_addr = htonl(INADDR_ANY);
+  addrPush.sin_port = htons(configurator_port);
 
   const int server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (server < 0) {
     err_msg = "unable to create socket";
     goto finally;
   }
+ 
 
-  fprintf(stdout, "Listening on TCP port %d\n", pop3_port);
+  const int pushServer = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if (pushServer < 0) {
+    err_msg = "unable to create socket";
+    goto finally;
+  }
 
   // man 7 ip. no importa reportar nada si falla.
   setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
+  setsockopt(pushServer, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int));
 
-  if (bind(server, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+  if (bind(server, (struct sockaddr*)&addrPop, sizeof(addrPop)) < 0) {
+    err_msg = "unable to bind socket";
+    goto finally;
+  }
+
+  if (bind(pushServer, (struct sockaddr*)&addrPush, sizeof(addrPush)) < 0) {
     err_msg = "unable to bind socket";
     goto finally;
   }
@@ -82,6 +98,14 @@ int main(int argc, char** argv) {
     err_msg = "unable to listen";
     goto finally;
   }
+
+  if (listen(pushServer, 20) < 0) {
+    err_msg = "unable to listen";
+    goto finally;
+  }
+
+   fprintf(stdout, "Listening for POP3 on TCP port %d\n", pop3_port);
+   fprintf(stdout, "Listening for config on TCP port %d\n", configurator_port);
 
   // registrar sigterm es útil para terminar el programa normalmente.
   // esto ayuda mucho en herramientas como valgrind.
@@ -120,6 +144,19 @@ int main(int argc, char** argv) {
     err_msg = "registering fd";
     goto finally;
   }
+
+
+  const struct fd_handler push3_passive_handler = {
+    .handle_read = push3_passive_accept,
+    .handle_write = NULL,
+    .handle_close = NULL, // nada que liberar
+  };
+  ss = selector_register(selector, pushServer, &push3_passive_handler, OP_READ, NULL);
+  if (ss != SELECTOR_SUCCESS) {
+    err_msg = "registering fd nuevo";
+    goto finally;
+  }
+
   while (!done) {
     err_msg = NULL;
     ss = selector_select(selector);
@@ -155,3 +192,4 @@ finally:
   }
   return ret;
 }
+
