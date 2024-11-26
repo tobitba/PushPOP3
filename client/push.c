@@ -31,8 +31,8 @@ static unsigned push_write(struct selector_key* key) {
     selector_set_interest_key(key, OP_READ);
   }
   push3_state currentState = data->stm.current->state;
-  if (currentState == GREETING) {
-    return AUTHORIZATION;
+  if (currentState == PUSH_GREETING) {
+    return PUSH_AUTHORIZATION;
   }
   return currentState;
 }
@@ -44,7 +44,7 @@ static unsigned push_read(struct selector_key* key) {
   ssize_t n = recv(key->fd, ptr, count, 0);
   printf("read\n");
   if (n <= 0) {
-    return ERROR;
+    return PUSH_ERROR;
   }
   buffer_write_adv(data->readBuff, n);
   PushCommand command = getPushCommand(data->readBuff, data->stm.current->state);
@@ -64,17 +64,17 @@ void push_greeting(const unsigned state, struct selector_key* key) {
 
 static const struct state_definition push3_states_handlers[] = {
   {
-    .state = GREETING,
+    .state = PUSH_GREETING,
     .on_arrival = push_greeting,
     .on_write_ready = push_write,
   },
   {
-    .state = AUTHORIZATION,
+    .state = PUSH_AUTHORIZATION,
     .on_read_ready = push_read,
     .on_write_ready = push_write,
   },
-  {.state = ERROR},
-  {.state = FINISH},
+  {.state = PUSH_ERROR},
+  {.state = PUSH_FINISH},
 };
 
 static void push3_done(struct selector_key* key) {
@@ -91,7 +91,7 @@ static void push3_read(struct selector_key* key) {
   struct state_machine* stm = &ATTACHMENT(key)->stm;
   const push3_state st = stm_handler_read(stm, key);
 
-  if (ERROR == st || FINISH == st) {
+  if (PUSH_ERROR == st || PUSH_FINISH == st) {
     push3_done(key);
   }
 }
@@ -101,7 +101,7 @@ static void push3_write(struct selector_key* key) {
   struct state_machine* stm = &ATTACHMENT(key)->stm;
   const push3_state st = stm_handler_write(stm, key);
 
-  if (ERROR == st || FINISH == st) {
+  if (PUSH_ERROR == st || PUSH_FINISH == st) {
     push3_done(key);
   }
 }
@@ -110,7 +110,7 @@ static void push3_block(struct selector_key* key) {
   struct state_machine* stm = &ATTACHMENT(key)->stm;
   const push3_state st = stm_handler_block(stm, key);
 
-  if (ERROR == st || FINISH == st) {
+  if (PUSH_ERROR == st || PUSH_FINISH == st) {
     push3_done(key);
   }
 }
@@ -145,11 +145,11 @@ void push3_passive_accept(struct selector_key* key) {
   }
   data = calloc(1, sizeof(push3));
   data->readBuff = malloc(sizeof(struct buffer));
-  buffer_init(data->readBuff, BUFFER_SIZE, data->readData);
+  buffer_init(data->readBuff, BUFFER_PUSH_SIZE, data->readData);
   data->writeBuff = malloc(sizeof(struct buffer));
-  buffer_init(data->writeBuff, BUFFER_SIZE, data->writeData);
-  data->stm.initial = GREETING;
-  data->stm.max_state = FINISH;
+  buffer_init(data->writeBuff, BUFFER_PUSH_SIZE, data->writeData);
+  data->stm.initial = PUSH_GREETING;
+  data->stm.max_state = PUSH_FINISH;
   data->stm.states = push3_states_handlers;
   stm_init(&data->stm);
   if (SELECTOR_SUCCESS != selector_register(key->s, client, &push3_handler, OP_WRITE, data)) {

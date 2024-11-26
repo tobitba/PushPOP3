@@ -55,16 +55,16 @@ void writeOnUserBuffer2(buffer* b, char* str) {
 push3_state loginHandler(push3* data, arg_type arg1, arg_type arg2) {
     if (!arg1.isArgPresent) {
       writeOnUserBuffer2(data->writeBuff, "->FAIL: Missing username\r\n");
-      return AUTHORIZATION;
+      return PUSH_AUTHORIZATION;
     }
     if (!arg2.isArgPresent) {
       writeOnUserBuffer2(data->writeBuff, "->FAIL: Missing password\r\n");
-      return AUTHORIZATION;
+      return PUSH_AUTHORIZATION;
     }
 
     if (!isUserAndPassValid(arg1.value, arg2.value)) {
       writeOnUserBuffer2(data->writeBuff, "->FAIL: Invalid username or password\r\n");
-      return AUTHORIZATION;
+      return PUSH_AUTHORIZATION;
     }
 
     if (data->user.name == NULL) {
@@ -78,11 +78,11 @@ push3_state loginHandler(push3* data, arg_type arg1, arg_type arg2) {
     strcpy(data->user.pass, arg1.value);
 
     writeOnUserBuffer2(data->writeBuff, "->SUCCESS: Logged in to the server\r\n");
-    return AUTHORIZATION;
+    return PUSH_AUTHORIZATION;
 }
 
 static const PushCommandCDT commands[COMMAND_COUNT] = {
-  {.state = AUTHORIZATION, .command_name = "LOGIN", .execute = loginHandler, .argCount = 2}
+  {.state = PUSH_AUTHORIZATION, .command_name = "LOGIN", .execute = loginHandler, .argCount = 2}
 };
 
 static PushCommand findPushCommand(const char* name) {
@@ -208,7 +208,7 @@ static bool pushCommandContextValidation(PushCommand command, push3* data) {
     return false;
   }
 
-  if (currentState == AUTHORIZATION && command->state != AUTHORIZATION) {
+  if (currentState == PUSH_AUTHORIZATION && command->state != PUSH_AUTHORIZATION) {
     writeOnUserBuffer2(data->writeBuff, "->FAIL: You must be logged in to run this command. Use LOGIN <user> <pass>\r\n");
     return false;
   }

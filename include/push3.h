@@ -7,18 +7,18 @@
 #include "selector.h"
 #include "stm.h"
 
-#define BUFFER_SIZE 2096 // TODO : revisar tamaño
+#define BUFFER_PUSH_SIZE 2096 // TODO : revisar tamaño
 
 typedef enum push3_state {
-    GREETING,
-    AUTHORIZATION,
-    ERROR,
-    FINISH,
+    PUSH_GREETING,
+    PUSH_AUTHORIZATION,
+    PUSH_ERROR,
+    PUSH_FINISH,
 } push3_state;
 
 typedef struct push3 {
     struct state_machine stm;
-    uint8_t writeData[BUFFER_SIZE], readData[BUFFER_SIZE];
+    uint8_t writeData[BUFFER_PUSH_SIZE], readData[BUFFER_PUSH_SIZE];
     buffer *writeBuff, *readBuff;
     User user;
 } push3;
