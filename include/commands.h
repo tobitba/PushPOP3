@@ -10,6 +10,6 @@ typedef struct CommandCDT* Command;
 
 Command getCommand(buffer* b, const state current);
 
-state runCommand(Command command, pop3* datos);
+state runCommand(Command command, pop3* data);
 
 #endif

@@ -36,6 +36,7 @@ typedef struct CommandCDT {
 } CommandCDT;
 
 static bool readCommandArg(Command command, char* arg, bool* isArgPresent, buffer* b);
+static bool commandContextValidation(Command command, pop3* data);
 
 void writeOnUserBuffer(buffer* b, char* str) {
   size_t lenght;
@@ -53,8 +54,8 @@ state noopHandler(pop3* data, char* arg1, bool isArgPresent) {
 state userHandler(pop3* data, char* arg1, bool isArg1Present) {
   puts("User handler");
   if (!isArg1Present) {
-    printf("No a valid command name\n");
-    return ERROR;
+    writeOnUserBuffer(data->writeBuff, "-ERR Missing username\r\n");
+    return AUTHORIZATION;
   }
   if (data->user.name == NULL) {
     data->user.name = calloc(1, MAX_ARG_LENGHT);
@@ -67,7 +68,8 @@ state userHandler(pop3* data, char* arg1, bool isArg1Present) {
 state passHandler(pop3* data, char* arg1, bool isArg1Present) {
   puts("Pass handler");
   if (!isArg1Present) {
-    return ERROR;
+    writeOnUserBuffer(data->writeBuff, "-ERR Missing password\r\n");
+    return AUTHORIZATION_PASS;
   }
   if (isUserAndPassValid(data->user.name, arg1)) {
     if (data->user.pass == NULL) {
@@ -79,7 +81,8 @@ state passHandler(pop3* data, char* arg1, bool isArg1Present) {
     return TRANSACTION; // User logged succesfully
   }
   printf("ret errorr :(  la pass recibida es: %s\n", arg1);
-  return ERROR; // TODO: add error msg
+  writeOnUserBuffer(data->writeBuff, "-ERR Invalid user & pass combination, try again\r\n");
+  return AUTHORIZATION;
 }
 
 state stat_handler(pop3* data, char* arg1, bool isArg1Present) {
@@ -96,12 +99,12 @@ static const CommandCDT commands[COMMAND_COUNT] = {
   {.state = TRANSACTION, .command_name = "NOOP", .execute = noopHandler, .argCount = 0},
 };
 
-static Command findCommand(const char* name, const state current) {
+static Command findCommand(const char* name) {
   for (int i = 0; i < COMMAND_COUNT; i++) {
-    if (commands[i].state == current && strncasecmp(name, commands[i].command_name, MAX_COMMAND_LENGHT) == 0) {
+    if (strncasecmp(name, commands[i].command_name, MAX_COMMAND_LENGHT) == 0) {
       Command command = malloc(sizeof(CommandCDT));
       if (command == NULL) return NULL;
-      command->state = current;
+      command->state = commands[i].state;
       strncpy(command->command_name, name, MAX_COMMAND_LENGHT + 1);
       command->execute = commands[i].execute;
       command->argCount = commands[i].argCount;
@@ -124,7 +127,7 @@ Command getCommand(buffer* b, const state current) {
     };
     commandName[i] = c;
   }
-  Command command = findCommand(commandName, current);
+  Command command = findCommand(commandName);
   if (command == NULL) {
     buffer_reset(b);
     return NULL;
@@ -155,9 +158,8 @@ Command getCommand(buffer* b, const state current) {
 }
 
 state runCommand(Command command, pop3* data) {
-  if (command == NULL) {
-    return ERROR;
-  }
+  if (!commandContextValidation(command, data))
+    return data->stm.current->state;
 
   printf("Running command: %s\n", command->command_name);
   state newState = command->execute(data, command->arg1, command->isArg1Present);
@@ -193,5 +195,43 @@ static bool readCommandArg(Command command, char* arg, bool* isArgPresent, buffe
   }
   arg[j] = '\0';
   *isArgPresent = true;
+  return true;
+}
+
+static bool commandContextValidation(Command command, pop3* data) {
+  state currentState = data->stm.current->state;
+  if (command == NULL) {
+    writeOnUserBuffer(data->writeBuff, "-ERR Invalid command\r\n");
+    return false;
+  }
+
+  if (command->state == ANYWHERE)
+    return true;
+
+  if (currentState == TRANSACTION && command->state != TRANSACTION) {
+    writeOnUserBuffer(data->writeBuff, "-ERR You are already logged in\r\n");
+    return false;
+  }
+
+  if (currentState != TRANSACTION && command->state == TRANSACTION) {
+    writeOnUserBuffer(data->writeBuff, "-ERR You must be logged in to use this command\r\n");
+    return false;
+  }
+
+  if (currentState == AUTHORIZATION && command->state == AUTHORIZATION_PASS) {
+    writeOnUserBuffer(data->writeBuff, "-ERR You must issue a USER command first\r\n");
+    return false;
+  }
+
+  if (currentState == AUTHORIZATION_PASS && command->state == AUTHORIZATION) {
+    writeOnUserBuffer(data->writeBuff, "-ERR You've already picked a User, try a password\r\n");
+    return false;
+  }
+
+  if (currentState != command->state) {
+    writeOnUserBuffer(data->writeBuff, "-ERR You don´t have access to this command\r\n");
+    return false;
+  }
+
   return true;
 }

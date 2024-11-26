@@ -18,6 +18,8 @@ enum pop3_states {
   AUTHORIZATION_PASS,
   // For bla bla commands
   TRANSACTION,
+  // Can use this command in any state
+  ANYWHERE,
   // MUst delete all dell mails and quit
   UPDATE,
   // If needed, add more states here

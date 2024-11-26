@@ -31,11 +31,11 @@ static unsigned pop_write(struct selector_key* key) {
     buffer_reset(datos->writeBuff);
     selector_set_interest_key(key, OP_READ);
   }
-  if (datos->stm.current->state == GREETING) {
+  state currentState = datos->stm.current->state;
+  if (currentState == GREETING) {
     return AUTHORIZATION;
   }
-  return datos->stm.current
-    ->state; // TODO: estoy es un puente al estado de TRANSACTIONAL, cambiar cuando se tenga manejo de users
+  return currentState;
 }
 
 static unsigned pop_read(struct selector_key* key) {
@@ -49,13 +49,10 @@ static unsigned pop_read(struct selector_key* key) {
   } else {
     buffer_write_adv(datos->readBuff, n);
     Command command = getCommand(datos->readBuff, datos->stm.current->state);
-    printf("ptest %d\n", command == NULL);
-    if (command != NULL) {
-      state newState = runCommand(command, datos);
-      printf("nyuevo estado: !!!%d\n", newState);
-      selector_set_interest_key(key, OP_WRITE);
-      return newState;
-    }
+    state newState = runCommand(command, datos);
+    printf("nuevo estado: %d\n", newState);
+    selector_set_interest_key(key, OP_WRITE);
+    return newState;
   }
 
   return datos->stm.current->state;
@@ -91,6 +88,7 @@ static const struct state_definition pop3_states_handlers[] = {
     .on_read_ready = pop_read,
 
   },
+  {.state = ANYWHERE},
   {.state = UPDATE},
   {.state = ERROR},
   {.state = FINISH},
