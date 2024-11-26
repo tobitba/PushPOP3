@@ -72,7 +72,7 @@ static void usage(const char* progname) {
   exit(1);
 }
 
-void parseArgs(const int argc, char** argv, struct pop3args* args) {
+void parseArgs(const int argc, char** argv, pop3args* args) {
   memset(args, 0, sizeof(*args)); // sobre todo para setear en null los punteros de users
 
   args->socksAddr = "0.0.0.0";

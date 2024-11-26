@@ -19,7 +19,7 @@ struct doh {
   char* query;
 };
 
-struct pop3args {
+typedef struct {
   char* socksAddr; // TODO: revisar bien...
   unsigned short socksPort;
 
@@ -31,13 +31,13 @@ struct pop3args {
   int userCount;
 
   const char* maildirPath;
-};
+} pop3args;
 
 /**
  * Interpreta la linea de comandos (argc, argv) llenando
  * args con defaults o la seleccion humana. Puede cortar
  * la ejecución.
  */
-void parseArgs(const int argc, char** argv, struct pop3args* args);
+void parseArgs(const int argc, char** argv, pop3args* args);
 
 #endif
