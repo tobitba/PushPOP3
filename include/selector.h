@@ -78,7 +78,7 @@ selector_status selector_init(const struct selector_init* c);
 /** deshace la incialización de la librería */
 selector_status selector_close(void);
 
-/* instancia un nuevo selector. returna NULL si no puede instanciar  */
+/* Instancia un nuevo selector. Retorna NULL si no puede instanciar  */
 fd_selector selector_new(const size_t initial_elements);
 
 /** destruye un selector creado por _new. Tolera NULLs */
@@ -132,10 +132,10 @@ typedef struct fd_handler {
 } fd_handler;
 
 /**
- * registra en el selector `s' un nuevo file descriptor `fd'.
+ * Registra en el selector `s` un nuevo file descriptor `fd`.
  *
- * Se especifica un `interest' inicial, y se pasa handler que manejará
- * los diferentes eventos. `data' es un adjunto que se pasa a todos
+ * Se especifica un `interest` inicial, y se pasa handler que manejará
+ * los diferentes eventos. `data` es un adjunto que se pasa a todos
  * los manejadores de eventos.
  *
  * No se puede registrar dos veces un mismo fd.

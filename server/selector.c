@@ -226,8 +226,8 @@ static void items_update_fdset_for_fd(fd_selector s, const struct item* item) {
 }
 
 /**
- * garantizar cierta cantidad de elemenos en `fds'.
- * Se asegura de que `n' sea un número que la plataforma donde corremos lo
+ * Garantizar cierta cantidad de elemenos en `fds`.
+ * Se asegura de que `n` sea un número que la plataforma donde corremos lo
  * soporta
  */
 static selector_status ensure_capacity(fd_selector s, const size_t n) {
