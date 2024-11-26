@@ -14,9 +14,9 @@
 #define ATTACHMENT(key) ((pop3*)(key)->data)
 
 static unsigned pop_write(struct selector_key* key) {
-  pop3* datos = key->data;
+  pop3* data = key->data;
   size_t count;
-  uint8_t* ptr = buffer_read_ptr(datos->writeBuff, &count);
+  uint8_t* ptr = buffer_read_ptr(data->writeBuff, &count);
 
   const ssize_t n = send(key->fd, ptr, count, MSG_NOSIGNAL);
   if (n == -1) {
@@ -28,10 +28,10 @@ static unsigned pop_write(struct selector_key* key) {
   if (n < 0) {
     printf("no pude mandar datos : (");
   } else {
-    buffer_reset(datos->writeBuff);
+    buffer_reset(data->writeBuff);
     selector_set_interest_key(key, OP_READ);
   }
-  state currentState = datos->stm.current->state;
+  state currentState = data->stm.current->state;
   if (currentState == GREETING) {
     return AUTHORIZATION;
   }
@@ -39,17 +39,17 @@ static unsigned pop_write(struct selector_key* key) {
 }
 
 static unsigned pop_read(struct selector_key* key) {
-  pop3* datos = ATTACHMENT(key);
+  pop3* data = ATTACHMENT(key);
   size_t count;
-  uint8_t* ptr = buffer_write_ptr(datos->readBuff, &count);
+  uint8_t* ptr = buffer_write_ptr(data->readBuff, &count);
   ssize_t n = recv(key->fd, ptr, count, 0);
   printf("read\n");
   if (n <= 0) {
     return ERROR;
   }
-  buffer_write_adv(datos->readBuff, n);
-  Command command = getCommand(datos->readBuff, datos->stm.current->state);
-  state newState = runCommand(command, datos);
+  buffer_write_adv(data->readBuff, n);
+  Command command = getCommand(data->readBuff, data->stm.current->state);
+  state newState = runCommand(command, data);
   printf("nuevo estado: %d\n", newState);
   selector_set_interest_key(key, OP_WRITE);
   return newState;
@@ -62,6 +62,15 @@ void pop_greeting(const unsigned state, struct selector_key* key) {
   memcpy(buf, greeting, strlen(greeting) + 1);
   buffer_write_adv(ATTACHMENT(key)->writeBuff, lenght);
 }
+
+// state multiline_write(struct selector_key* key) {
+//   pop3* data = key->data;
+//   // int mailLength = fseek(data->mailToReadFd, long off, int whence);
+//   int mailLength = 9;
+//   int sentLength = send(key->fd, data->mailToReadFd, mailLength, MSG_NOSIGNAL);
+//   if (sentLength == mailLength) return TRANSACTION;
+//   return MULTILINE_RESPONSE;
+// }
 
 static const struct state_definition pop3_states_handlers[] = {
   {
@@ -86,6 +95,10 @@ static const struct state_definition pop3_states_handlers[] = {
 
   },
   {.state = ANYWHERE},
+  // {
+  //   .state = MULTILINE_RESPONSE,
+  //   .on_write_ready = multiline_write,
+  // },
   {.state = UPDATE},
   {.state = ERROR},
   {.state = FINISH},
@@ -150,7 +163,7 @@ static const struct fd_handler pop3_handler = {
 
 void pop3_passive_accept(struct selector_key* key) {
   fprintf(stdout, "pasive handler\n");
-  pop3* datos = NULL;
+  pop3* data = NULL;
   const int client = accept(key->fd, NULL, NULL); // TODO: revisar argumentos
   if (client == -1) {
     goto fail;
@@ -158,19 +171,19 @@ void pop3_passive_accept(struct selector_key* key) {
   if (selector_fd_set_nio(client) == -1) {
     goto fail;
   }
-  datos = calloc(1, sizeof(pop3));
-  datos->readBuff = malloc(sizeof(struct buffer));
-  buffer_init(datos->readBuff, BUFFER_SIZE, datos->readData);
-  datos->writeBuff = malloc(sizeof(struct buffer));
-  buffer_init(datos->writeBuff, BUFFER_SIZE, datos->writeData);
-  datos->stm.initial = GREETING;
-  datos->stm.max_state = FINISH;
-  datos->stm.states = pop3_states_handlers;
-  stm_init(&datos->stm);
+  data = calloc(1, sizeof(pop3));
+  data->readBuff = malloc(sizeof(struct buffer));
+  buffer_init(data->readBuff, BUFFER_SIZE, data->readData);
+  data->writeBuff = malloc(sizeof(struct buffer));
+  buffer_init(data->writeBuff, BUFFER_SIZE, data->writeData);
+  data->stm.initial = GREETING;
+  data->stm.max_state = FINISH;
+  data->stm.states = pop3_states_handlers;
+  stm_init(&data->stm);
   printf("agrego a selector\n");
-  datos->mails = NULL;
+  data->mails = NULL;
 
-  if (SELECTOR_SUCCESS != selector_register(key->s, client, &pop3_handler, OP_WRITE, datos)) {
+  if (SELECTOR_SUCCESS != selector_register(key->s, client, &pop3_handler, OP_WRITE, data)) {
     goto fail;
   }
   printf("agregado a selector\n");

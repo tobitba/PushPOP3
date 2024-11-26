@@ -31,15 +31,15 @@
 
 extern pop3args args;
 
-typedef state (*handler)(pop3* datos, char* arg1, bool isArg1Present);
+typedef state (*handler)(pop3* data, char* arg, bool isArgPresent);
 
 typedef struct CommandCDT {
   state state;
   char command_name[MAX_COMMAND_LENGHT + 1];
   handler execute;
   int argCount;
-  char arg1[MAX_ARG_LENGHT + 1];
-  bool isArg1Present;
+  char arg[MAX_ARG_LENGHT + 1];
+  bool isArgPresent;
 } CommandCDT;
 
 static bool readCommandArg(Command command, char* arg, bool* isArgPresent, buffer* b);
@@ -65,47 +65,47 @@ void writeOnUserBuffer(pop3* data, const char* fmt, ...) {
   buffer_write_adv(data->writeBuff, length);
 }
 
-state noopHandler(pop3* data, char* arg1, bool _) {
+state noopHandler(pop3* data, char* _arg, bool _argPresent) {
   puts("Noop handler");
   writeOnUserBuffer(data, OK);
   return TRANSACTION;
 }
 
-state userHandler(pop3* data, char* arg1, bool isArg1Present) {
+state userHandler(pop3* data, char* arg, bool argPresent) {
   puts("User handler");
-  if (!isArg1Present) {
+  if (!argPresent) {
     writeOnUserBuffer(data, "-ERR Missing username\r\n");
     return AUTHORIZATION;
   }
   if (data->user.name == NULL) {
     data->user.name = calloc(1, MAX_ARG_LENGHT);
   }
-  strcpy(data->user.name, arg1);
+  strcpy(data->user.name, arg);
   writeOnUserBuffer(data, OK);
   return AUTHORIZATION_PASS;
 }
 
-state passHandler(pop3* data, char* arg1, bool isArg1Present) {
+state passHandler(pop3* data, char* arg, bool argPresent) {
   puts("Pass handler");
-  if (!isArg1Present) {
+  if (!argPresent) {
     writeOnUserBuffer(data, "-ERR Missing password\r\n");
     return AUTHORIZATION_PASS;
   }
-  if (isUserAndPassValid(data->user.name, arg1)) {
+  if (isUserAndPassValid(data->user.name, arg)) {
     if (data->user.pass == NULL) {
       data->user.pass = calloc(1, MAX_ARG_LENGHT);
     }
-    strcpy(data->user.pass, arg1);
+    strcpy(data->user.pass, arg);
     data->mails = maildirInit(data->user.name, args.maildirPath);
     writeOnUserBuffer(data, "+OK maildrop locked and ready\r\n");
     return TRANSACTION; // User logged succesfully
   }
-  printf("ret errorr :(  la pass recibida es: %s\n", arg1);
+  printf("ret errorr :(  la pass recibida es: %s\n", arg);
   writeOnUserBuffer(data, "-ERR Invalid user & pass combination, try again\r\n");
   return AUTHORIZATION;
 }
 
-state statHandler(pop3* data, char* arg1, bool _) {
+state statHandler(pop3* data, char* arg, bool _) {
   puts("Stat handler");
   writeOnUserBuffer(data, "+OK %lu %lu\r\n", data->mails->length, maildirGetTotalSize(data->mails));
   return TRANSACTION;
@@ -127,7 +127,7 @@ static Command findCommand(const char* name) {
       strncpy(command->command_name, name, MAX_COMMAND_LENGHT + 1);
       command->execute = commands[i].execute;
       command->argCount = commands[i].argCount;
-      command->isArg1Present = false;
+      command->isArgPresent = false;
       return command;
     }
   }
@@ -152,7 +152,7 @@ Command getCommand(buffer* b, const state current) {
   }
 
   if (command->argCount > 0) {
-    if (!readCommandArg(command, command->arg1, &(command->isArg1Present), b)) {
+    if (!readCommandArg(command, command->arg, &(command->isArgPresent), b)) {
       free(command);
       buffer_reset(b);
       return NULL;
@@ -182,7 +182,7 @@ state runCommand(Command command, pop3* data) {
   }
 
   printf("Running command: %s\n", command->command_name);
-  state newState = command->execute(data, command->arg1, command->isArg1Present);
+  state newState = command->execute(data, command->arg, command->isArgPresent);
   free(command);
   return newState;
 }
