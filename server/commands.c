@@ -74,7 +74,7 @@ state noopHandler(pop3* data, char* arg1, bool _) {
 state userHandler(pop3* data, char* arg1, bool isArg1Present) {
   puts("User handler");
   if (!isArg1Present) {
-    writeOnUserBuffer(data->writeBuff, "-ERR Missing username\r\n");
+    writeOnUserBuffer(data, "-ERR Missing username\r\n");
     return AUTHORIZATION;
   }
   if (data->user.name == NULL) {
@@ -88,7 +88,7 @@ state userHandler(pop3* data, char* arg1, bool isArg1Present) {
 state passHandler(pop3* data, char* arg1, bool isArg1Present) {
   puts("Pass handler");
   if (!isArg1Present) {
-    writeOnUserBuffer(data->writeBuff, "-ERR Missing password\r\n");
+    writeOnUserBuffer(data, "-ERR Missing password\r\n");
     return AUTHORIZATION_PASS;
   }
   if (isUserAndPassValid(data->user.name, arg1)) {
@@ -101,7 +101,7 @@ state passHandler(pop3* data, char* arg1, bool isArg1Present) {
     return TRANSACTION; // User logged succesfully
   }
   printf("ret errorr :(  la pass recibida es: %s\n", arg1);
-  writeOnUserBuffer(data->writeBuff, "-ERR Invalid user & pass combination, try again\r\n");
+  writeOnUserBuffer(data, "-ERR Invalid user & pass combination, try again\r\n");
   return AUTHORIZATION;
 }
 
@@ -111,7 +111,7 @@ state statHandler(pop3* data, char* arg1, bool _) {
   return TRANSACTION;
 }
 
-static const CommandCDT commands[COMMAND_COUNT] = {
+static const CommandCDT commands[] = {
   {.state = AUTHORIZATION, .command_name = "USER", .execute = userHandler, .argCount = 1},
   {.state = AUTHORIZATION_PASS, .command_name = "PASS", .execute = passHandler, .argCount = 1},
   {.state = TRANSACTION, .command_name = "STAT", .execute = statHandler, .argCount = 0},
@@ -222,35 +222,34 @@ static bool readCommandArg(Command command, char* arg, bool* isArgPresent, buffe
 static bool commandContextValidation(Command command, pop3* data) {
   state currentState = data->stm.current->state;
   if (command == NULL) {
-    writeOnUserBuffer(data->writeBuff, "-ERR Invalid command\r\n");
+    writeOnUserBuffer(data, "-ERR Invalid command\r\n");
     return false;
   }
 
-  if (command->state == ANYWHERE)
-    return true;
+  if (command->state == ANYWHERE) return true;
 
   if (currentState == TRANSACTION && command->state != TRANSACTION) {
-    writeOnUserBuffer(data->writeBuff, "-ERR You are already logged in\r\n");
+    writeOnUserBuffer(data, "-ERR You are already logged in\r\n");
     return false;
   }
 
   if (currentState != TRANSACTION && command->state == TRANSACTION) {
-    writeOnUserBuffer(data->writeBuff, "-ERR You must be logged in to use this command\r\n");
+    writeOnUserBuffer(data, "-ERR You must be logged in to use this command\r\n");
     return false;
   }
 
   if (currentState == AUTHORIZATION && command->state == AUTHORIZATION_PASS) {
-    writeOnUserBuffer(data->writeBuff, "-ERR You must issue a USER command first\r\n");
+    writeOnUserBuffer(data, "-ERR You must issue a USER command first\r\n");
     return false;
   }
 
   if (currentState == AUTHORIZATION_PASS && command->state == AUTHORIZATION) {
-    writeOnUserBuffer(data->writeBuff, "-ERR You've already picked a User, try a password\r\n");
+    writeOnUserBuffer(data, "-ERR You've already picked a User, try a password\r\n");
     return false;
   }
 
   if (currentState != command->state) {
-    writeOnUserBuffer(data->writeBuff, "-ERR You don´t have access to this command\r\n");
+    writeOnUserBuffer(data, "-ERR You don´t have access to this command\r\n");
     return false;
   }
 
