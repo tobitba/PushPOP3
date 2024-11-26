@@ -51,27 +51,51 @@ void maildirFree(MailArray* mails) {
 bool maildirMarkAsSeen(MailArray* mails, size_t mailNumber) {
   if (mails == NULL || mailNumber == 0) return false;
   Mail* mail = mails->array + mailNumber - 1;
-  if (mail->state != NEW) return false;
+  if (mail->state != NEW || mail->markedDeleted) return false;
   mail->state = SEEN;
   char* newPath = malloc(PATH_MAX + 1);
   snprintf(newPath, PATH_MAX, "%s/%s", mails->pathSeen, mail->filename);
   printf("%s - filename: %s,  path: %s\n", __func__, mail->filename, mail->path);
   if (rename(mail->path, newPath) < 0) {
     perror("Error moving file");
-    exit(EXIT_FAILURE);
+    return false;
   }
   free(mail->path);
   mail->path = newPath;
   return true;
 }
 
-size_t maildirGetTotalSize(MailArray* mails) {
+size_t maildirNonDeletedCount(MailArray* mails) {
   size_t size = 0;
-  for (size_t i = 0; i < mails->length; ++i) size += mails->array[i].nbytes;
+  for (size_t i = 0; i < mails->length; ++i) {
+    if (!mails->array[i].markedDeleted) size += 1;
+  }
   return size;
 }
 
+size_t maildirGetTotalSize(MailArray* mails) {
+  size_t size = 0;
+  for (size_t i = 0; i < mails->length; ++i) {
+    if (!mails->array[i].markedDeleted) size += mails->array[i].nbytes;
+  }
+  return size;
+}
+
+int maildirDeleteMarked(MailArray* mails) {
+  bool errors = 0;
+  for (size_t i = 0; i < mails->length; ++i) {
+    if (mails->array[i].markedDeleted) {
+      if (remove(mails->array[i].path) < 0) {
+        perror("Error deleting file");
+        errors = -1;
+      }
+    }
+  }
+  return errors;
+}
+
 void _maildirAddMail(MailArray* mails, char* filename, char* path, MailState state, size_t nbytes) {
+
   if (mails->length == mails->capacity) {
     mails->capacity += CAPACITY_INCREMENT;
     Mail* aux = realloc(mails->array, mails->capacity * sizeof(Mail));
@@ -82,6 +106,7 @@ void _maildirAddMail(MailArray* mails, char* filename, char* path, MailState sta
     mails->array = aux;
   }
   Mail* mail = mails->array + mails->length;
+  mail->markedDeleted = false;
   mail->filename = filename;
   mail->path = path;
   mail->state = state;

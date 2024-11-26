@@ -32,12 +32,15 @@
 extern pop3args args;
 
 typedef state (*handler)(pop3* data, char* arg, bool isArgPresent);
-state noopHandler(pop3* data, char* _arg, bool _argPresent);
 state userHandler(pop3* data, char* arg, bool argPresent);
 state passHandler(pop3* data, char* arg, bool argPresent);
-state statHandler(pop3* data, char* arg, bool _);
+state statHandler(pop3* data, char* _arg, bool _argPresent);
+state noopHandler(pop3* data, char* _arg, bool _argPresent);
 state listHandler(pop3* data, char* arg, bool argPresent);
 state retrHandler(pop3* data, char* arg, bool argPresent);
+state deleHandler(pop3* data, char* arg, bool argPresent);
+state rsetHandler(pop3* data, char* _arg, bool _argPresent);
+state quitHandler(pop3* data, char* _arg, bool _argPresent);
 
 typedef struct CommandCDT {
   state state;
@@ -48,7 +51,7 @@ typedef struct CommandCDT {
   bool isArgPresent;
 } CommandCDT;
 
-typedef enum { USER, PASS, STAT, NOOP, LIST, RETR } CommandNames;
+typedef enum { USER, PASS, STAT, NOOP, LIST, RETR, DELE, RSET, QUIT } CommandNames;
 
 static CommandCDT commands[] = {
   [USER] = {.state = AUTHORIZATION, .command_name = "USER", .execute = userHandler, .argCount = 1},
@@ -57,6 +60,9 @@ static CommandCDT commands[] = {
   [NOOP] = {.state = TRANSACTION, .command_name = "NOOP", .execute = noopHandler, .argCount = 0},
   [LIST] = {.state = TRANSACTION, .command_name = "LIST", .execute = listHandler, .argCount = 1},
   [RETR] = {.state = TRANSACTION, .command_name = "RETR", .execute = retrHandler, .argCount = 1},
+  [DELE] = {.state = TRANSACTION, .command_name = "DELE", .execute = deleHandler, .argCount = 1},
+  [RSET] = {.state = TRANSACTION, .command_name = "RSET", .execute = rsetHandler, .argCount = 0},
+  [QUIT] = {.state = ANYWHERE, .command_name = "QUIT", .execute = quitHandler, .argCount = 0},
 };
 
 static bool readCommandArg(Command command, char* arg, bool* isArgPresent, buffer* b);
@@ -135,7 +141,7 @@ size_t listMailsTillBufferFull(pop3* data, size_t startIdx) {
   size_t i;
   for (i = startIdx; i < mailCount; ++i) {
     Mail mail = data->mails->array[i];
-    if (mail.state != DELETED) {
+    if (!mail.markedDeleted) {
       if (!writeResponse(data, "%lu %lu\r\n", mail.number, mail.nbytes)) {
         break;
       }
@@ -146,8 +152,9 @@ size_t listMailsTillBufferFull(pop3* data, size_t startIdx) {
 
 state listHandler(pop3* data, char* arg, bool argPresent) {
   if (data->stm.current->state == PENDING_RESPONSE) {
-    *(size_t*)data->pendingData = listMailsTillBufferFull(data, *(int*)data->pendingData);
-    if (*(size_t*)data->pendingData < data->mails->length) return PENDING_RESPONSE;
+    size_t* listedLast = data->pendingData;
+    *listedLast = listMailsTillBufferFull(data, *listedLast);
+    if (*listedLast < data->mails->length) return PENDING_RESPONSE;
     data->pendingCommand = NULL;
     free(data->pendingData);
   } else {
@@ -158,10 +165,18 @@ state listHandler(pop3* data, char* arg, bool argPresent) {
         writeResponse(data, "-ERR no such message\r\n");
         return TRANSACTION;
       }
+      Mail mail = data->mails->array[mailNumber - 1];
+      if (mail.markedDeleted) {
+        writeResponse(data, "-ERR the mail was marked to be deleted\r\n");
+        return TRANSACTION;
+      }
       writeResponse(data, "+OK %i %lu\r\n", mailNumber, data->mails->array[mailNumber - 1].nbytes);
     } else {
       size_t mailCount = data->mails->length;
-      writeResponse(data, "+OK %lu messages (%lu octects)\r\n", mailCount, maildirGetTotalSize(data->mails));
+      writeResponse(
+        data, "+OK %lu messages (%lu octects)\r\n", maildirNonDeletedCount(data->mails),
+        maildirGetTotalSize(data->mails)
+      );
       size_t listedCount = listMailsTillBufferFull(data, 0);
       if (listedCount < mailCount) {
         data->pendingCommand = &commands[LIST];
@@ -190,12 +205,13 @@ state retrHandler(pop3* data, char* arg, bool argPresent) {
       return TRANSACTION;
     }
     Mail mail = data->mails->array[mailNumber - 1];
-    if (mail.state == DELETED) {
+    if (mail.markedDeleted) {
       writeResponse(data, "-ERR the mail was marked to be deleted\r\n");
       return TRANSACTION;
     }
     file = fopen(mail.path, "r");
     maildirMarkAsSeen(data->mails, mailNumber);
+    writeResponse(data, "+OK %lu octects\r\n", mail.nbytes);
   }
   size_t availableWriteLength;
   uint8_t* buf = buffer_write_ptr(data->writeBuff, &availableWriteLength);
@@ -210,6 +226,46 @@ state retrHandler(pop3* data, char* arg, bool argPresent) {
     data->pendingData = file;
     return PENDING_RESPONSE;
   }
+}
+
+state deleHandler(pop3* data, char* arg, bool argPresent) {
+  if (!argPresent) {
+    writeResponse(data, "-ERR missing argument\r\n");
+    return TRANSACTION;
+  }
+  size_t mailNumber = atoi(arg);
+  if (mailNumber == 0 || mailNumber > data->mails->length) {
+    writeResponse(data, "-ERR no such message\r\n");
+    return TRANSACTION;
+  }
+  Mail* mail = data->mails->array + mailNumber - 1;
+  if (mail->markedDeleted) {
+    writeResponse(data, "-ERR message %lu has already been marked to be deleted\r\n", mailNumber);
+    return TRANSACTION;
+  }
+  mail->markedDeleted = true;
+  writeResponse(data, "+OK message %lu marked to be deleted\r\n", mailNumber);
+  return TRANSACTION;
+}
+
+state rsetHandler(pop3* data, char* _arg, bool _argPresent) {
+  for (size_t i = 0; i < data->mails->length; ++i) {
+    data->mails->array[i].markedDeleted = false;
+  }
+  writeResponse(data, OK);
+  return TRANSACTION;
+}
+
+state quitHandler(pop3* data, char* _arg, bool _argPresent) {
+  if (data->stm.current->state == TRANSACTION) {
+    if (maildirDeleteMarked(data->mails) < 0) {
+      writeResponse(data, "-ERR some deleted messages not removed\r\n");
+    } else {
+      writeResponse(data, "+OK\r\n");
+    }
+  }
+  // TODO: handle propper logout
+  return UPDATE;
 }
 
 static Command findCommand(const char* name) {

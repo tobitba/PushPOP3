@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-typedef enum { NEW, SEEN, DELETED } MailState;
+typedef enum { NEW, SEEN } MailState;
 
 typedef struct Mail {
   size_t number;
@@ -11,6 +11,7 @@ typedef struct Mail {
   char* path;
   size_t nbytes;
   MailState state;
+  bool markedDeleted;
 } Mail;
 
 typedef struct {
@@ -23,7 +24,9 @@ typedef struct {
 
 MailArray* maildirInit(char* username, const char* maildir);
 void maildirFree(MailArray* mails);
+size_t maildirNonDeletedCount(MailArray* mails);
 size_t maildirGetTotalSize(MailArray* mails);
 bool maildirMarkAsSeen(MailArray* mails, size_t mailNumber);
+int maildirDeleteMarked(MailArray* mails);
 
 #endif

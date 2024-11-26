@@ -106,9 +106,13 @@ static const struct state_definition pop3_states_handlers[] = {
 
   },
   {.state = ANYWHERE},
-  {.state = UPDATE},
   {
-    .state = PENDING_RESPONSE, .on_write_ready = pending_write,
+    .state = UPDATE,
+    .on_write_ready = pop_write, // TODO add read handler and close session and stuff
+  },
+  {
+    .state = PENDING_RESPONSE,
+    .on_write_ready = pending_write,
   },
   {.state = ERROR},
   {.state = FINISH},
