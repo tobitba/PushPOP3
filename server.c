@@ -120,7 +120,7 @@ int main(int argc, char** argv) {
     err_msg = "registering fd";
     goto finally;
   }
-  for (; !done;) {
+  while (!done) {
     err_msg = NULL;
     ss = selector_select(selector);
     if (ss != SELECTOR_SUCCESS) {

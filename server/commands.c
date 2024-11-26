@@ -137,8 +137,7 @@ static Command findCommand(const char* name) {
 Command getCommand(buffer* b, const state current) {
   // los comandos en pop3 son de 4 caracteres (case insensitive)
   char commandName[MAX_COMMAND_LENGHT + 1] = {0};
-  int i = 0;
-  for (; i < MAX_COMMAND_LENGHT && buffer_can_read(b); i++) {
+  for (int i = 0; i < MAX_COMMAND_LENGHT && buffer_can_read(b); i++) {
     char c = (char)buffer_read(b);
     if (!IS_ALPHABET(c)) {
       buffer_reset(b);
