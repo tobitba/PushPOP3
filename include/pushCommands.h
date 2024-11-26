@@ -1,5 +1,5 @@
-#ifndef COMMANDS_H
-#define COMMANDS_H
+#ifndef PUSH_COMMANDS_H
+#define PUSH_COMMANDS_H
 
 #include "push3.h"
 
