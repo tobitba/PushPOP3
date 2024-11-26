@@ -25,7 +25,6 @@ static unsigned push_write(struct selector_key* key) {
     return 0;
   }
   if (n < 0) {
-    printf("no pude mandar data : (");
   } else {
     buffer_reset(data->writeBuff);
     selector_set_interest_key(key, OP_READ);
@@ -33,6 +32,9 @@ static unsigned push_write(struct selector_key* key) {
   push3_state currentState = data->stm.current->state;
   if (currentState == PUSH_GREETING) {
     return PUSH_AUTHORIZATION;
+  }
+  if (currentState == PUSH_DONE || currentState == PUSH_ERROR) {
+    return PUSH_FINISH;
   }
   return currentState;
 }
@@ -42,14 +44,12 @@ static unsigned push_read(struct selector_key* key) {
   size_t count;
   uint8_t* ptr = buffer_write_ptr(data->readBuff, &count);
   ssize_t n = recv(key->fd, ptr, count, 0);
-  printf("read\n");
   if (n <= 0) {
     return PUSH_ERROR;
   }
   buffer_write_adv(data->readBuff, n);
   PushCommand command = getPushCommand(data->readBuff, data->stm.current->state);
   push3_state newState = runPushCommand(command, data);
-  printf("nuevo estado: %d\n", newState);
   selector_set_interest_key(key, OP_WRITE);
   return newState;
 }
@@ -79,6 +79,9 @@ static const struct state_definition push3_states_handlers[] = {
   },
   {
     .state = PUSH_ANYWHERE
+  },{
+    .state = PUSH_DONE,
+    .on_write_ready = push_write
   },
   {.state = PUSH_ERROR},
   {.state = PUSH_FINISH},
@@ -90,6 +93,11 @@ static void push3_done(struct selector_key* key) {
     if (SELECTOR_SUCCESS != selector_unregister_fd(key->s, fd)) {
       abort();
     }
+    struct linger so_linger;
+    so_linger.l_onoff = 1;
+    so_linger.l_linger = 0;
+    setsockopt(fd, SOL_SOCKET, SO_LINGER, &so_linger, sizeof(so_linger));
+
     close(fd);
   }
 }
@@ -104,7 +112,6 @@ static void push3_read(struct selector_key* key) {
 }
 
 static void push3_write(struct selector_key* key) {
-  printf("write handleeer\n");
   struct state_machine* stm = &ATTACHMENT(key)->stm;
   const push3_state st = stm_handler_write(stm, key);
 
@@ -141,7 +148,6 @@ static const struct fd_handler push3_handler = {
 };
 
 void push3_passive_accept(struct selector_key* key) {
-  fprintf(stdout, "pasive handler\n");
   push3* data = NULL;
   const int client = accept(key->fd, NULL, NULL); // TODO: revisar argumentos
   if (client == -1) {

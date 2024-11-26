@@ -80,7 +80,6 @@ bool writeResponse(pop3* data, const char* fmt, ...) {
     fprintf(stderr, "vsnprintf failed\n");
     exit(EXIT_FAILURE);
   } else if (length > MAX_RESPONSE_LENGTH) {
-    printf("Response truncated\n");
     length = MAX_RESPONSE_LENGTH;
   }
   size_t availableWriteLength;
@@ -92,13 +91,11 @@ bool writeResponse(pop3* data, const char* fmt, ...) {
 }
 
 state noopHandler(pop3* data, char* _arg, bool _argPresent) {
-  puts("Noop handler");
   writeResponse(data, OK);
   return TRANSACTION;
 }
 
 state userHandler(pop3* data, char* arg, bool argPresent) {
-  puts("User handler");
   if (!argPresent) {
     writeResponse(data, "-ERR Missing username\r\n");
     return AUTHORIZATION;
@@ -112,7 +109,6 @@ state userHandler(pop3* data, char* arg, bool argPresent) {
 }
 
 state passHandler(pop3* data, char* arg, bool argPresent) {
-  puts("Pass handler");
   if (!argPresent) {
     writeResponse(data, "-ERR Missing password\r\n");
     return AUTHORIZATION_PASS;
@@ -126,13 +122,11 @@ state passHandler(pop3* data, char* arg, bool argPresent) {
     writeResponse(data, "+OK maildrop locked and ready\r\n");
     return TRANSACTION; // User logged succesfully
   }
-  printf("ret errorr :(  la pass recibida es: %s\n", arg);
   writeResponse(data, "-ERR Invalid user & pass combination, try again\r\n");
   return AUTHORIZATION;
 }
 
 state statHandler(pop3* data, char* arg, bool _) {
-  puts("Stat handler");
   writeResponse(data, "+OK %lu %lu\r\n", data->mails->length, maildirGetTotalSize(data->mails));
   return TRANSACTION;
 }
@@ -159,7 +153,6 @@ state listHandler(pop3* data, char* arg, bool argPresent) {
     data->pendingCommand = NULL;
     free(data->pendingData);
   } else {
-    puts("LIST handler");
     if (argPresent) {
       size_t mailNumber = atoi(arg);
       if (mailNumber == 0 || mailNumber > data->mails->length) {
@@ -326,14 +319,12 @@ state runCommand(Command command, pop3* data) {
     return data->stm.current->state;
   }
 
-  printf("Running command: %s\n", command->command_name);
   state newState = command->execute(data, command->arg, command->isArgPresent);
   return newState;
 }
 
 state continuePendingCommand(pop3* data) {
   Command command = data->pendingCommand;
-  printf("Continuing command: %s\n", command->command_name);
   state newState = command->execute(data, command->arg, command->isArgPresent);
   // if (newState != PENDING_RESPONSE) free(command);
   return newState;
