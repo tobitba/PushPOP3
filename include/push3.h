@@ -12,6 +12,8 @@
 typedef enum push3_state {
     PUSH_GREETING,
     PUSH_AUTHORIZATION,
+    PUSH_TRANSACTION,
+    PUSH_ANYWHERE,
     PUSH_ERROR,
     PUSH_FINISH,
 } push3_state;

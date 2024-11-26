@@ -2,7 +2,7 @@
 #include "../include/buffer.h"
 #include "../include/push3.h"
 #include "../include/authenticator.h"
-
+#include "../include/serverMetrics.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,7 +13,7 @@
 #define MAX_RESPONSE_LENGHT 2096
 #define MAX_COMMAND_LENGHT 20
 #define MAX_ARG_LENGHT 40
-#define COMMAND_COUNT 1
+#define COMMAND_COUNT 3
 #define SPACE_CHAR 32
 #define ENTER_CHAR '\n'
 #define CARRIAGE_RETURN_CHAR '\r'
@@ -78,11 +78,20 @@ push3_state loginHandler(push3* data, arg_type arg1, arg_type arg2) {
     strcpy(data->user.pass, arg1.value);
 
     writeOnUserBuffer2(data->writeBuff, "->SUCCESS: Logged in to the server\r\n");
-    return PUSH_AUTHORIZATION;
+    return PUSH_TRANSACTION;
+}
+
+push3_state getMetricsHandler(push3* data, arg_type arg1, arg_type arg2) {
+    char reply[MAX_RESPONSE_LENGHT + 1];
+    sprintf(reply, "->SUCCESS:\nCurrent connections count: %ld\nTotal connections count: %ld\nTotal bytes from mails read: %ld\r\n", getCurrentConnections(), getTotalConnections(), getTotalReadBytes());
+    writeOnUserBuffer2(data->writeBuff, reply);
+    return PUSH_TRANSACTION;
 }
 
 static const PushCommandCDT commands[COMMAND_COUNT] = {
-  {.state = PUSH_AUTHORIZATION, .command_name = "LOGIN", .execute = loginHandler, .argCount = 2}
+  {.state = PUSH_AUTHORIZATION, .command_name = "LOGIN", .execute = loginHandler, .argCount = 2},
+  {.state = PUSH_TRANSACTION, .command_name = "GET_METRICS", .execute = getMetricsHandler, .argCount = 0},
+  {.state = PUSH_ANYWHERE, .command_name = "FINISH", .execute = NULL, .argCount = 0}
 };
 
 static PushCommand findPushCommand(const char* name) {
@@ -208,8 +217,15 @@ static bool pushCommandContextValidation(PushCommand command, push3* data) {
     return false;
   }
 
-  if (currentState == PUSH_AUTHORIZATION && command->state != PUSH_AUTHORIZATION) {
-    writeOnUserBuffer2(data->writeBuff, "->FAIL: You must be logged in to run this command. Use LOGIN <user> <pass>\r\n");
+  if (command->state == PUSH_ANYWHERE) return true;
+
+  if (currentState == PUSH_TRANSACTION && command->state != PUSH_TRANSACTION) {
+    writeOnUserBuffer2(data->writeBuff, "->FAIL: You are already logged in! Try other commands\r\n");
+    return false;
+  }
+
+  if (currentState != PUSH_TRANSACTION && command->state == PUSH_TRANSACTION) {
+    writeOnUserBuffer2(data->writeBuff, "->FAIL: You must be logged in to use this command. Try running LOGIN <user> <pass>\r\n");
     return false;
   }
 
