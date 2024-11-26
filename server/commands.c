@@ -32,6 +32,12 @@
 extern pop3args args;
 
 typedef state (*handler)(pop3* data, char* arg, bool isArgPresent);
+state noopHandler(pop3* data, char* _arg, bool _argPresent);
+state userHandler(pop3* data, char* arg, bool argPresent);
+state passHandler(pop3* data, char* arg, bool argPresent);
+state statHandler(pop3* data, char* arg, bool _);
+state listHandler(pop3* data, char* arg, bool argPresent);
+state retrHandler(pop3* data, char* arg, bool argPresent);
 
 typedef struct CommandCDT {
   state state;
@@ -42,10 +48,21 @@ typedef struct CommandCDT {
   bool isArgPresent;
 } CommandCDT;
 
+typedef enum { USER, PASS, STAT, NOOP, LIST, RETR } CommandNames;
+
+static CommandCDT commands[] = {
+  [USER] = {.state = AUTHORIZATION, .command_name = "USER", .execute = userHandler, .argCount = 1},
+  [PASS] = {.state = AUTHORIZATION_PASS, .command_name = "PASS", .execute = passHandler, .argCount = 1},
+  [STAT] = {.state = TRANSACTION, .command_name = "STAT", .execute = statHandler, .argCount = 0},
+  [NOOP] = {.state = TRANSACTION, .command_name = "NOOP", .execute = noopHandler, .argCount = 0},
+  [LIST] = {.state = TRANSACTION, .command_name = "LIST", .execute = listHandler, .argCount = 1},
+  [RETR] = {.state = TRANSACTION, .command_name = "RETR", .execute = retrHandler, .argCount = 1},
+};
+
 static bool readCommandArg(Command command, char* arg, bool* isArgPresent, buffer* b);
 static bool commandContextValidation(Command command, pop3* data);
 
-void writeOnUserBuffer(pop3* data, const char* fmt, ...) {
+bool writeResponse(pop3* data, const char* fmt, ...) {
   va_list args;
   va_start(args, fmt);
 
@@ -61,34 +78,36 @@ void writeOnUserBuffer(pop3* data, const char* fmt, ...) {
   }
   size_t availableWriteLength;
   uint8_t* buf = buffer_write_ptr(data->writeBuff, &availableWriteLength);
+  if (availableWriteLength < (size_t)length) return false;
   memcpy(buf, response, length);
   buffer_write_adv(data->writeBuff, length);
+  return true;
 }
 
 state noopHandler(pop3* data, char* _arg, bool _argPresent) {
   puts("Noop handler");
-  writeOnUserBuffer(data, OK);
+  writeResponse(data, OK);
   return TRANSACTION;
 }
 
 state userHandler(pop3* data, char* arg, bool argPresent) {
   puts("User handler");
   if (!argPresent) {
-    writeOnUserBuffer(data, "-ERR Missing username\r\n");
+    writeResponse(data, "-ERR Missing username\r\n");
     return AUTHORIZATION;
   }
   if (data->user.name == NULL) {
     data->user.name = calloc(1, MAX_ARG_LENGHT);
   }
   strcpy(data->user.name, arg);
-  writeOnUserBuffer(data, OK);
+  writeResponse(data, OK);
   return AUTHORIZATION_PASS;
 }
 
 state passHandler(pop3* data, char* arg, bool argPresent) {
   puts("Pass handler");
   if (!argPresent) {
-    writeOnUserBuffer(data, "-ERR Missing password\r\n");
+    writeResponse(data, "-ERR Missing password\r\n");
     return AUTHORIZATION_PASS;
   }
   if (isUserAndPassValid(data->user.name, arg)) {
@@ -97,38 +116,107 @@ state passHandler(pop3* data, char* arg, bool argPresent) {
     }
     strcpy(data->user.pass, arg);
     data->mails = maildirInit(data->user.name, args.maildirPath);
-    writeOnUserBuffer(data, "+OK maildrop locked and ready\r\n");
+    writeResponse(data, "+OK maildrop locked and ready\r\n");
     return TRANSACTION; // User logged succesfully
   }
   printf("ret errorr :(  la pass recibida es: %s\n", arg);
-  writeOnUserBuffer(data, "-ERR Invalid user & pass combination, try again\r\n");
+  writeResponse(data, "-ERR Invalid user & pass combination, try again\r\n");
   return AUTHORIZATION;
 }
 
 state statHandler(pop3* data, char* arg, bool _) {
   puts("Stat handler");
-  writeOnUserBuffer(data, "+OK %lu %lu\r\n", data->mails->length, maildirGetTotalSize(data->mails));
+  writeResponse(data, "+OK %lu %lu\r\n", data->mails->length, maildirGetTotalSize(data->mails));
   return TRANSACTION;
 }
 
-static const CommandCDT commands[] = {
-  {.state = AUTHORIZATION, .command_name = "USER", .execute = userHandler, .argCount = 1},
-  {.state = AUTHORIZATION_PASS, .command_name = "PASS", .execute = passHandler, .argCount = 1},
-  {.state = TRANSACTION, .command_name = "STAT", .execute = statHandler, .argCount = 0},
-  {.state = TRANSACTION, .command_name = "NOOP", .execute = noopHandler, .argCount = 0},
-};
+size_t listMailsTillBufferFull(pop3* data, size_t startIdx) {
+  size_t mailCount = data->mails->length;
+  size_t i;
+  for (i = startIdx; i < mailCount; ++i) {
+    Mail mail = data->mails->array[i];
+    if (mail.state != DELETED) {
+      if (!writeResponse(data, "%lu %lu\r\n", mail.number, mail.nbytes)) {
+        break;
+      }
+    }
+  }
+  return i;
+}
+
+state listHandler(pop3* data, char* arg, bool argPresent) {
+  if (data->stm.current->state == PENDING_RESPONSE) {
+    *(size_t*)data->pendingData = listMailsTillBufferFull(data, *(int*)data->pendingData);
+    if (*(size_t*)data->pendingData < data->mails->length) return PENDING_RESPONSE;
+    data->pendingCommand = NULL;
+    free(data->pendingData);
+  } else {
+    puts("LIST handler");
+    if (argPresent) {
+      size_t mailNumber = atoi(arg);
+      if (mailNumber == 0 || mailNumber > data->mails->length) {
+        writeResponse(data, "-ERR invalid mail number\r\n");
+        return TRANSACTION;
+      }
+      writeResponse(data, "+OK %i %lu\r\n", mailNumber, data->mails->array[mailNumber - 1].nbytes);
+    } else {
+      size_t mailCount = data->mails->length;
+      writeResponse(data, "+OK %lu messages:\r\n", mailCount);
+      size_t listedCount = listMailsTillBufferFull(data, 0);
+      if (listedCount < mailCount) {
+        data->pendingCommand = &commands[LIST];
+        data->pendingData = malloc(sizeof(size_t));
+        *(size_t*)data->pendingData = listedCount;
+        return PENDING_RESPONSE;
+      }
+    }
+  }
+  if (!writeResponse(data, ".\r\n")) return PENDING_RESPONSE;
+  return TRANSACTION;
+}
+
+state retrHandler(pop3* data, char* arg, bool argPresent) {
+  FILE* file;
+  if (data->stm.current->state == PENDING_RESPONSE) {
+    file = data->pendingData;
+  } else {
+    if (!argPresent) {
+      writeResponse(data, "-ERR missing argument\r\n");
+      return TRANSACTION;
+    }
+    size_t mailNumber = atoi(arg);
+    if (mailNumber == 0 || mailNumber > data->mails->length) {
+      writeResponse(data, "-ERR invalid mail number\r\n");
+      return TRANSACTION;
+    }
+    Mail mail = data->mails->array[mailNumber - 1];
+    if (mail.state == DELETED) {
+      writeResponse(data, "-ERR the mail was marked to be deleted\r\n");
+      return TRANSACTION;
+    }
+    file = fopen(mail.path, "r");
+    maildirMarkAsSeen(data->mails, mailNumber);
+  }
+  size_t availableWriteLength;
+  uint8_t* buf = buffer_write_ptr(data->writeBuff, &availableWriteLength);
+  size_t length = fread(buf, 1, availableWriteLength, file);
+  buffer_write_adv(data->writeBuff, length);
+  if (feof(file)) {
+    if (!writeResponse(data, ".\r\n")) return PENDING_RESPONSE;
+    fclose(file);
+    return TRANSACTION;
+  } else {
+    data->pendingCommand = &commands[RETR];
+    data->pendingData = file;
+    return PENDING_RESPONSE;
+  }
+}
 
 static Command findCommand(const char* name) {
   for (size_t i = 0; i < COMMAND_COUNT; i++) {
     if (strncasecmp(name, commands[i].command_name, MAX_COMMAND_LENGHT) == 0) {
-      Command command = malloc(sizeof(CommandCDT));
-      if (command == NULL) return NULL;
-      command->state = commands[i].state;
-      strncpy(command->command_name, name, MAX_COMMAND_LENGHT + 1);
-      command->execute = commands[i].execute;
-      command->argCount = commands[i].argCount;
-      command->isArgPresent = false;
-      return command;
+      commands[i].isArgPresent = false;
+      return commands + i;
     }
   }
   return NULL;
@@ -153,20 +241,17 @@ Command getCommand(buffer* b, const state current) {
 
   if (command->argCount > 0) {
     if (!readCommandArg(command, command->arg, &(command->isArgPresent), b)) {
-      free(command);
       buffer_reset(b);
       return NULL;
     }
   }
 
   if (!buffer_can_read(b) || buffer_read(b) != CARRIAGE_RETURN_CHAR) {
-    free(command);
     buffer_reset(b);
     return NULL;
   }
 
   if (!buffer_can_read(b) || buffer_read(b) != ENTER_CHAR) {
-    free(command);
     buffer_reset(b);
     return NULL;
   }
@@ -177,13 +262,19 @@ Command getCommand(buffer* b, const state current) {
 
 state runCommand(Command command, pop3* data) {
   if (!commandContextValidation(command, data)) {
-    free(command);
     return data->stm.current->state;
   }
 
   printf("Running command: %s\n", command->command_name);
   state newState = command->execute(data, command->arg, command->isArgPresent);
-  free(command);
+  return newState;
+}
+
+state continuePendingCommand(pop3* data) {
+  Command command = data->pendingCommand;
+  printf("Continuing command: %s\n", command->command_name);
+  state newState = command->execute(data, command->arg, command->isArgPresent);
+  // if (newState != PENDING_RESPONSE) free(command);
   return newState;
 }
 
@@ -216,36 +307,36 @@ static bool readCommandArg(Command command, char* arg, bool* isArgPresent, buffe
 }
 
 static bool commandContextValidation(Command command, pop3* data) {
-  state currentState = data->stm.current->state;
   if (command == NULL) {
-    writeOnUserBuffer(data, "-ERR Invalid command\r\n");
+    writeResponse(data, "-ERR Invalid command\r\n");
     return false;
   }
+  state currentState = data->stm.current->state;
 
   if (command->state == ANYWHERE) return true;
 
   if (currentState == TRANSACTION && command->state != TRANSACTION) {
-    writeOnUserBuffer(data, "-ERR You are already logged in\r\n");
+    writeResponse(data, "-ERR You are already logged in\r\n");
     return false;
   }
 
   if (currentState != TRANSACTION && command->state == TRANSACTION) {
-    writeOnUserBuffer(data, "-ERR You must be logged in to use this command\r\n");
+    writeResponse(data, "-ERR You must be logged in to use this command\r\n");
     return false;
   }
 
   if (currentState == AUTHORIZATION && command->state == AUTHORIZATION_PASS) {
-    writeOnUserBuffer(data, "-ERR You must issue a USER command first\r\n");
+    writeResponse(data, "-ERR You must issue a USER command first\r\n");
     return false;
   }
 
   if (currentState == AUTHORIZATION_PASS && command->state == AUTHORIZATION) {
-    writeOnUserBuffer(data, "-ERR You've already picked a User, try a password\r\n");
+    writeResponse(data, "-ERR You've already picked a User, try a password\r\n");
     return false;
   }
 
   if (currentState != command->state) {
-    writeOnUserBuffer(data, "-ERR You don´t have access to this command\r\n");
+    writeResponse(data, "-ERR You don't have access to this command\r\n");
     return false;
   }
 

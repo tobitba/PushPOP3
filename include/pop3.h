@@ -7,8 +7,10 @@
 #include "selector.h"
 #include "stm.h"
 #include <netdb.h>
+#include <stdio.h>
 
-#define BUFFER_SIZE 521 // TODO : revisar tamaño
+#define BUFFER_SIZE 512 // TODO : revisar tamaño
+typedef struct CommandCDT* Command;
 
 enum pop3_states {
   GREETING,
@@ -24,6 +26,8 @@ enum pop3_states {
   UPDATE,
   // If needed, add more states here
 
+  PENDING_RESPONSE,
+
   // Final states
   ERROR,
   FINISH,
@@ -37,6 +41,8 @@ typedef struct pop3 {
   buffer *writeBuff, *readBuff;
   User user;
   MailArray* mails;
+  Command pendingCommand;
+  void* pendingData;
 } pop3;
 
 void pop3_passive_accept(struct selector_key* key);
