@@ -73,6 +73,13 @@ static const struct state_definition push3_states_handlers[] = {
     .on_read_ready = push_read,
     .on_write_ready = push_write,
   },
+  { .state = PUSH_TRANSACTION,
+    .on_read_ready = push_read,
+    .on_write_ready = push_write,
+  },
+  {
+    .state = PUSH_ANYWHERE
+  },
   {.state = PUSH_ERROR},
   {.state = PUSH_FINISH},
 };

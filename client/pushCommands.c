@@ -118,13 +118,15 @@ PushCommand getPushCommand(buffer* b, push3_state current) {
   for (; i < MAX_COMMAND_LENGHT && buffer_can_read(b); i++) {
     char c = (char)buffer_peak(b);
     if (c == SPACE_CHAR || c == CARRIAGE_RETURN_CHAR) {
-      if (i == 0)
+      if (i == 0) {
+        buffer_reset(b);
         return NULL;
+      }
       break;
     }
 
     c = (char)buffer_read(b);
-    if (!IS_ALPHABET(c) || c != LOW_BAR_CHAR) {
+    if (!IS_ALPHABET(c) && c != LOW_BAR_CHAR) {
       buffer_reset(b);
       return NULL;
     };
