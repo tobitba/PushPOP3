@@ -155,13 +155,13 @@ state listHandler(pop3* data, char* arg, bool argPresent) {
     if (argPresent) {
       size_t mailNumber = atoi(arg);
       if (mailNumber == 0 || mailNumber > data->mails->length) {
-        writeResponse(data, "-ERR invalid mail number\r\n");
+        writeResponse(data, "-ERR no such message\r\n");
         return TRANSACTION;
       }
       writeResponse(data, "+OK %i %lu\r\n", mailNumber, data->mails->array[mailNumber - 1].nbytes);
     } else {
       size_t mailCount = data->mails->length;
-      writeResponse(data, "+OK %lu messages:\r\n", mailCount);
+      writeResponse(data, "+OK %lu messages (%lu octects)\r\n", mailCount, maildirGetTotalSize(data->mails));
       size_t listedCount = listMailsTillBufferFull(data, 0);
       if (listedCount < mailCount) {
         data->pendingCommand = &commands[LIST];
@@ -186,7 +186,7 @@ state retrHandler(pop3* data, char* arg, bool argPresent) {
     }
     size_t mailNumber = atoi(arg);
     if (mailNumber == 0 || mailNumber > data->mails->length) {
-      writeResponse(data, "-ERR invalid mail number\r\n");
+      writeResponse(data, "-ERR no such message\r\n");
       return TRANSACTION;
     }
     Mail mail = data->mails->array[mailNumber - 1];
