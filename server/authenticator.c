@@ -1,6 +1,6 @@
 #include "../include/authenticator.h"
 #include "../include/args.h"
-#include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 
 static User* userList;
@@ -11,11 +11,11 @@ void initAuthenticator(User* newUsers, int newUserCount) {
   userCount = newUserCount;
 }
 
-int userMatch(char* user, char* savedUser) {
+bool userMatch(char* user, char* savedUser) {
   return strcmp(user, savedUser) == 0;
 }
 
-int passMatch(char* pass, char* savedPass) {
+bool passMatch(char* pass, char* savedPass) {
   return strcmp(pass, savedPass) == 0;
 }
 
