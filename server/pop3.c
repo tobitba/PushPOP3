@@ -57,10 +57,10 @@ static unsigned pop_read(struct selector_key* key) {
 
 void pop_greeting(const unsigned state, struct selector_key* key) {
   size_t lenght;
-  char greeting[] = "+OK PushPop3\r\n";
   uint8_t* buf = buffer_write_ptr(ATTACHMENT(key)->writeBuff, &lenght);
-  memcpy(buf, greeting, strlen(greeting) + 1);
-  buffer_write_adv(ATTACHMENT(key)->writeBuff, lenght);
+  char greeting[] = "+OK PushPop3\r\n";
+  memcpy(buf, greeting, sizeof(greeting) - 1);
+  buffer_write_adv(ATTACHMENT(key)->writeBuff, sizeof(greeting) - 1);
 }
 
 // state multiline_write(struct selector_key* key) {
